@@ -174,60 +174,76 @@ def solve_potential_flow_cube(
     return p, u, v, w
 
 
-phi, u, v, w = solve_potential_flow_cube()
+if __name__ == "__main__":
+    phi, u, v, w = solve_potential_flow_cube()
 
-nx, ny, nz = phi.shape
-dx = dy = dz = 0.1
-x = np.linspace(0, dx * (nx - 1), nx)
-y = np.linspace(0, dy * (ny - 1), ny)
-z = np.linspace(0, dz * (nz - 1), nz)
-X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
+    nx, ny, nz = phi.shape
+    dx = dy = dz = 0.1
+    x = np.linspace(0, dx * (nx - 1), nx)
+    y = np.linspace(0, dy * (ny - 1), ny)
+    z = np.linspace(0, dz * (nz - 1), nz)
+    X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
 
-# --- 3D slice visualization of phi ---
-fig1 = plt.figure(figsize=(8, 6))
-ax1 = fig1.add_subplot(111, projection="3d")
-midx, midy, midz = nx // 2, ny // 2, nz // 2
-# insert three orthogonal filled contours as slices
-ax1.contourf(
-    X[:, :, midz], Y[:, :, midz], phi[:, :, midz], zdir="z", offset=z[midz], levels=20
-)
-ax1.contourf(
-    X[:, midy, :], Z[:, midy, :], phi[:, midy, :], zdir="y", offset=y[midy], levels=20
-)
-ax1.contourf(
-    Y[midx, :, :], Z[midx, :, :], phi[midx, :, :], zdir="x", offset=x[midx], levels=20
-)
-ax1.set_xlabel("x")
-ax1.set_ylabel("y")
-ax1.set_zlabel("z")
-ax1.set_title("3D Slices of Potential (phi)")
-fig1.savefig("phi_slices_3d.png", dpi=220, bbox_inches="tight")
-plt.show()
-# plt.close(fig1)
+    # --- 3D slice visualization of phi ---
+    fig1 = plt.figure(figsize=(8, 6))
+    ax1 = fig1.add_subplot(111, projection="3d")
+    midx, midy, midz = nx // 2, ny // 2, nz // 2
+    # insert three orthogonal filled contours as slices
+    ax1.contourf(
+        X[:, :, midz],
+        Y[:, :, midz],
+        phi[:, :, midz],
+        zdir="z",
+        offset=z[midz],
+        levels=20,
+    )
+    ax1.contourf(
+        X[:, midy, :],
+        Z[:, midy, :],
+        phi[:, midy, :],
+        zdir="y",
+        offset=y[midy],
+        levels=20,
+    )
+    ax1.contourf(
+        Y[midx, :, :],
+        Z[midx, :, :],
+        phi[midx, :, :],
+        zdir="x",
+        offset=x[midx],
+        levels=20,
+    )
+    ax1.set_xlabel("x")
+    ax1.set_ylabel("y")
+    ax1.set_zlabel("z")
+    ax1.set_title("3D Slices of Potential (phi)")
+    fig1.savefig("phi_slices_3d.png", dpi=220, bbox_inches="tight")
+    plt.show()
+    # plt.close(fig1)
 
-# --- 3D quiver of velocities (subsampled & excluding cube interior) ---
-step = 3
-ii = np.arange(0, nx, step)
-jj = np.arange(0, ny, step)
-kk = np.arange(0, nz, step)
-II, JJ, KK = np.meshgrid(ii, jj, kk, indexing="ij")
+    # --- 3D quiver of velocities (subsampled & excluding cube interior) ---
+    step = 3
+    ii = np.arange(0, nx, step)
+    jj = np.arange(0, ny, step)
+    kk = np.arange(0, nz, step)
+    II, JJ, KK = np.meshgrid(ii, jj, kk, indexing="ij")
 
-mask = ~((7 < II) & (II < 13) & (7 < JJ) & (JJ < 13) & (7 < KK) & (KK < 13))
+    mask = ~((7 < II) & (II < 13) & (7 < JJ) & (JJ < 13) & (7 < KK) & (KK < 13))
 
-Xq = X[II, JJ, KK][mask]
-Yq = Y[II, JJ, KK][mask]
-Zq = Z[II, JJ, KK][mask]
-Uq = u[II, JJ, KK][mask]
-Vq = v[II, JJ, KK][mask]
-Wq = w[II, JJ, KK][mask]
+    Xq = X[II, JJ, KK][mask]
+    Yq = Y[II, JJ, KK][mask]
+    Zq = Z[II, JJ, KK][mask]
+    Uq = u[II, JJ, KK][mask]
+    Vq = v[II, JJ, KK][mask]
+    Wq = w[II, JJ, KK][mask]
 
-fig2 = plt.figure(figsize=(8, 6))
-ax2 = fig2.add_subplot(111, projection="3d")
-ax2.quiver(Xq, Yq, Zq, Uq, Vq, Wq, length=0.05, normalize=True)
-ax2.set_xlabel("x")
-ax2.set_ylabel("y")
-ax2.set_zlabel("z")
-ax2.set_title("3D Velocity Field (quiver)")
-fig2.savefig("velocity_quiver.png", dpi=220, bbox_inches="tight")
-plt.show()
-# plt.close(fig2)
+    fig2 = plt.figure(figsize=(8, 6))
+    ax2 = fig2.add_subplot(111, projection="3d")
+    ax2.quiver(Xq, Yq, Zq, Uq, Vq, Wq, length=0.1, normalize=True) # pyright: ignore[reportArgumentType]
+    ax2.set_xlabel("x")
+    ax2.set_ylabel("y")
+    ax2.set_zlabel("z")
+    ax2.set_title("3D Velocity Field (quiver)")
+    fig2.savefig("velocity_quiver.png", dpi=220, bbox_inches="tight")
+    plt.show()
+    # plt.close(fig2)
