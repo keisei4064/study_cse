@@ -276,7 +276,7 @@ if __name__ == "__main__":
 
     fig2 = plt.figure(figsize=(8, 6))
     ax2 = fig2.add_subplot(111, projection="3d")
-    ax2.quiver(Xq, Yq, Zq, Uq, Vq, Wq, length=0.05, normalize=True)
+    ax2.quiver(Xq, Yq, Zq, Uq, Vq, Wq, length=0.1, normalize=True) # pyright: ignore[reportArgumentType]
     ax2.set_xlabel("x")
     ax2.set_ylabel("y")
     ax2.set_zlabel("z")
