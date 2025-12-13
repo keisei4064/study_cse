@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -30,11 +32,12 @@ print(np.round(A_pinv_A, 3))
 
 # --- 可視化（ヒートマップ） ---
 fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+fig.suptitle("Forward difference matrix and pseudoinverse heatmaps", fontsize=14)
 
 sns.heatmap(
     A, annot=True, fmt=".0f", cmap="coolwarm", cbar=False, ax=axes[0, 0], square=True
 )
-axes[0, 0].set_title("A (4x5)")
+axes[0, 0].set_title(r"$A\, (4\times 5)$")
 
 sns.heatmap(
     A_pinv,
@@ -45,17 +48,21 @@ sns.heatmap(
     ax=axes[0, 1],
     square=True,
 )
-axes[0, 1].set_title("A^+ (5x4)")
+axes[0, 1].set_title(r"$A^{+}\, (5\times 4)$")
 
 sns.heatmap(
     AA_pinv, annot=True, fmt=".1f", cmap="Blues", cbar=False, ax=axes[1, 0], square=True
 )
-axes[1, 0].set_title("AA^+ (4x4)")
+axes[1, 0].set_title(r"$AA^{+}\, (4\times 4)$")
 
 sns.heatmap(
     A_pinv_A, annot=True, fmt=".2f", cmap="Reds", cbar=False, ax=axes[1, 1], square=True
 )
-axes[1, 1].set_title("A^+A (5x5)")
+axes[1, 1].set_title(r"$A^{+}A\, (5\times 5)$")
 
-plt.tight_layout()
+out_path = Path(__file__).parent / "prob32_heatmap.png"
+plt.savefig(out_path, dpi=300)
+print(f"Saved heatmap to: {out_path}")
+
+plt.tight_layout(rect=(0, 0, 1, 0.96))
 plt.show()
