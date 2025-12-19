@@ -5,22 +5,22 @@
 # - 台形則
 # - 蛙飛び法
 
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Mapping
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import animation
+from matplotlib.axes import Axes
+from matplotlib.lines import Line2D
+from cycler import cycler
 
 
-def neon_plot(x, y, ax=None):
-    if ax is None:
-        ax = plt.gca()
-    (line,) = ax.plot(x, y, lw=1.0, zorder=6)
-    for cont in range(6, 1, -1):
-        ax.plot(x, y, lw=cont, color=line.get_color(), zorder=5, alpha=0.06)
-    return line
-
-
-def run_simulation(method_name, dt=2 * np.pi / 16, steps=64):
+def run_simulation(
+    method_name: str, dt: float = 2 * np.pi / 16, steps: int = 64
+) -> tuple[np.ndarray, np.ndarray]:
     # 初期条件: (u, v) = (1, 0) からスタート
     u = np.zeros(steps + 1)
     v = np.zeros(steps + 1)
@@ -98,7 +98,17 @@ def run_simulation(method_name, dt=2 * np.pi / 16, steps=64):
     return u, v
 
 
-def plot_orbits(methods, dt=2 * np.pi / 16, steps=64, show_exact=False):
+def neon_plot(x: np.ndarray, y: np.ndarray, ax: Axes | None = None) -> Line2D:
+    if ax is None:
+        ax = plt.gca()
+    (line,) = ax.plot(x, y, lw=1.0, zorder=6)
+    for cont in range(7, 1, -1):
+        ax.plot(x, y, lw=cont, color=line.get_color(), zorder=5, alpha=0.07)
+    return line
+
+
+def setup_neon_style() -> list[str]:
+    color_cycle = ["#00f5d4", "#f15bb5", "#9b5de5", "#fee440", "#00bbf9"]
     plt.rcParams.update(
         {
             "figure.facecolor": "#0b0f1a",
@@ -109,11 +119,28 @@ def plot_orbits(methods, dt=2 * np.pi / 16, steps=64, show_exact=False):
             "ytick.color": "#e6e6e6",
             "text.color": "#e6e6e6",
             "grid.color": "#6c6f93",
-            "axes.prop_cycle": plt.cycler(
-                "color", ["#00f5d4", "#f15bb5", "#9b5de5", "#fee440", "#00bbf9"]
-            ),
+            "axes.prop_cycle": cycler("color", color_cycle),
         }
     )
+    return color_cycle
+
+
+def create_neon_lines(ax: Axes, color: str) -> tuple[Line2D, list[Line2D], Line2D]:
+    glow_widths = [7, 6, 5, 4, 3]
+    glow_lines = []
+    for lw in glow_widths:
+        (glow_line,) = ax.plot([], [], lw=lw, color=color, alpha=0.07, zorder=5)
+        glow_lines.append(glow_line)
+    (core_line,) = ax.plot([], [], lw=1.0, color=color, zorder=6)
+    (point,) = ax.plot([], [], ".", color=color, markersize=6, zorder=7)
+    return core_line, glow_lines, point
+
+
+def plot_orbits(
+    trajectories: Mapping[str, tuple[np.ndarray, np.ndarray]],
+    show_exact: bool = False,
+) -> None:
+    setup_neon_style()
 
     fig, ax = plt.subplots(figsize=(10, 10))
 
@@ -130,9 +157,8 @@ def plot_orbits(methods, dt=2 * np.pi / 16, steps=64, show_exact=False):
             zorder=2,
         )
 
-    for method in methods:
+    for method, (u_res, v_res) in trajectories.items():
         try:
-            u_res, v_res = run_simulation(method, dt=dt, steps=steps)
             if u_res[1] is not None:
                 line = neon_plot(u_res, v_res, ax=ax)
                 line.set_label(method)
@@ -151,9 +177,9 @@ def plot_orbits(methods, dt=2 * np.pi / 16, steps=64, show_exact=False):
     ax.set_title("Phase Space Trajectories")
     ax.set_xlabel("Position u")
     ax.set_ylabel("Velocity v")
-    ax.axis("equal")
-    ax.set_xlim((-2, 2))
-    ax.set_ylim((-2, 2))
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_xlim((-1.9, 1.9))
+    ax.set_ylim((-1.9, 1.9))
     ax.legend(
         frameon=False,
         labelcolor="#f5f5f5",
@@ -167,7 +193,93 @@ def plot_orbits(methods, dt=2 * np.pi / 16, steps=64, show_exact=False):
     plt.show()
 
 
+def animate_orbits(
+    trajectories: Mapping[str, tuple[np.ndarray, np.ndarray]],
+    show_exact: bool = False,
+    interval: int = 80,
+    save_path: Path | None = None,
+) -> None:
+    color_cycle = setup_neon_style()
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    if show_exact:
+        theta = np.linspace(0, 2 * np.pi, 200)
+        ax.plot(
+            np.cos(theta),
+            np.sin(theta),
+            "--",
+            color="#8be9fd",
+            alpha=0.25,
+            label="Exact (Circle)",
+            zorder=2,
+        )
+
+    line_sets = {}
+
+    methods = list(trajectories.keys())
+    for method, color in zip(methods, (color_cycle * len(methods))):
+        u_res, v_res = trajectories[method]
+        core_line, glow_lines, point = create_neon_lines(ax, color)
+        core_line.set_label(method)
+        line_sets[method] = (core_line, glow_lines, point)
+
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_xlim((-1.9, 1.9))
+    ax.set_ylim((-1.9, 1.9))
+    ax.grid(True, alpha=0.25, zorder=1)
+    ax.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+
+    def init() -> list[Line2D]:
+        artists: list[Line2D] = []
+        for method in methods:
+            core_line, glow_lines, point = line_sets[method]
+            core_line.set_data([], [])
+            point.set_data([], [])
+            artists.append(core_line)
+            artists.append(point)
+            for glow_line in glow_lines:
+                glow_line.set_data([], [])
+                artists.append(glow_line)
+        return artists
+
+    def update(frame: int) -> list[Line2D]:
+        artists: list[Line2D] = []
+        for method in methods:
+            u_res, v_res = trajectories[method]
+            core_line, glow_lines, point = line_sets[method]
+            x = u_res[: frame + 1]
+            y = v_res[: frame + 1]
+            core_line.set_data(x, y)
+            point.set_data([u_res[frame]], [v_res[frame]])
+            artists.append(core_line)
+            artists.append(point)
+            for glow_line in glow_lines:
+                glow_line.set_data(x, y)
+                artists.append(glow_line)
+        return artists
+
+    anim = animation.FuncAnimation(
+        fig,
+        update,
+        frames=len(next(iter(trajectories.values()))[0]),
+        init_func=init,
+        interval=interval,
+        blit=True,
+    )
+
+    if save_path is None:
+        save_path = Path(__file__).resolve().parent / "circular_orbit.gif"
+    anim.save(save_path, writer=animation.PillowWriter(fps=int(1000 / interval)))
+
+    plt.show()
+
+
 if __name__ == "__main__":
     # --- 実行と描画 ---
     methods = ["Forward Euler", "Backward Euler", "Trapezoidal", "Leapfrog"]
-    plot_orbits(methods)
+    trajectories = {method: run_simulation(method, steps=80) for method in methods}
+    plot_orbits(trajectories)
+    animate_orbits(trajectories)
