@@ -98,7 +98,7 @@ def run_simulation(method_name, dt=2 * np.pi / 16, steps=64):
     return u, v
 
 
-def plot_orbits(methods, dt=2 * np.pi / 16, steps=64):
+def plot_orbits(methods, dt=2 * np.pi / 16, steps=64, show_exact=False):
     plt.rcParams.update(
         {
             "figure.facecolor": "#0b0f1a",
@@ -117,30 +117,32 @@ def plot_orbits(methods, dt=2 * np.pi / 16, steps=64):
 
     fig, ax = plt.subplots(figsize=(10, 10))
 
-    # 真の軌道（円）を描画
-    theta = np.linspace(0, 2 * np.pi, 200)
-    ax.plot(
-        np.cos(theta),
-        np.sin(theta),
-        "--",
-        color="#8be9fd",
-        alpha=0.25,
-        label="Exact (Circle)",
-        zorder=2,
-    )
+    if show_exact:
+        # 真の軌道（円）を描画
+        theta = np.linspace(0, 2 * np.pi, 200)
+        ax.plot(
+            np.cos(theta),
+            np.sin(theta),
+            "--",
+            color="#8be9fd",
+            alpha=0.25,
+            label="Exact (Circle)",
+            zorder=2,
+        )
 
     for method in methods:
         try:
             u_res, v_res = run_simulation(method, dt=dt, steps=steps)
             if u_res[1] is not None:
                 line = neon_plot(u_res, v_res, ax=ax)
+                line.set_label(method)
                 ax.plot(
                     u_res,
                     v_res,
                     ".",
                     color=line.get_color(),
-                    label=method,
-                    markersize=3,
+                    label="_nolegend_",
+                    markersize=5,
                     zorder=7,
                 )
         except TypeError:
@@ -152,7 +154,12 @@ def plot_orbits(methods, dt=2 * np.pi / 16, steps=64):
     ax.axis("equal")
     ax.set_xlim((-2, 2))
     ax.set_ylim((-2, 2))
-    ax.legend(frameon=False)
+    ax.legend(
+        frameon=False,
+        labelcolor="#f5f5f5",
+        handlelength=2.2,
+        handletextpad=0.6,
+    )
     ax.grid(True, alpha=0.25, zorder=1)
     fig.tight_layout()
     output_path = Path(__file__).resolve().parent / "circular_orbit.png"
