@@ -7,6 +7,8 @@
 
 # 安定条件は: dt <= 2/sqrt(9) = 2/3
 
+from pathlib import Path
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -72,4 +74,6 @@ ax_bad.legend()
 
 fig.suptitle("Leapfrog Method Stability (separate scales)")
 fig.tight_layout()
+output_dir = Path(__file__).resolve().parent
+fig.savefig(output_dir / "leapfrog_stability.png", dpi=150)
 plt.show()
