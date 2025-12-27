@@ -9,3 +9,10 @@
 ![circular_orbit.png](strang/2-2/circular_orbit.png)
 
 ![circular_orbit.gif](strang/2-2/circular_orbit.gif)
+
+## 4次ルンゲクッタで数値計算安定性が失われる様子
+
+問題設定（硬い微分方程式）:  
+$u' = -100u + 100\sin(t),\ u(0) = 0$
+
+![rk4_stiff_stability.png](strang/6-2/rk4_stiff_stability.png)
