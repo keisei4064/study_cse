@@ -230,6 +230,7 @@ if __name__ == "__main__":
     )
 
     import matplotlib.pyplot as plt
+    from matplotlib import colors as mcolors
 
     nx, ny, nz = phi.shape
     dx = dy = dz = 0.1
@@ -273,10 +274,32 @@ if __name__ == "__main__":
     Uq = u[II, JJ, KK][mask]
     Vq = v[II, JJ, KK][mask]
     Wq = w[II, JJ, KK][mask]
+    speed = np.sqrt(Uq**2 + Vq**2 + Wq**2)
 
     fig2 = plt.figure(figsize=(8, 6))
     ax2 = fig2.add_subplot(111, projection="3d")
-    ax2.quiver(Xq, Yq, Zq, Uq, Vq, Wq, length=0.1, normalize=True) # pyright: ignore[reportArgumentType]
+    cmap = plt.get_cmap("viridis")
+    vmin = float(np.percentile(speed, 5))
+    vmax = float(np.percentile(speed, 95))
+    if vmax <= vmin:
+        vmin = float(np.min(speed))
+        vmax = float(np.max(speed))
+    norm = mcolors.PowerNorm(gamma=0.5, vmin=vmin, vmax=vmax)
+    colors = cmap(norm(speed))
+    ax2.quiver(
+        Xq,
+        Yq,
+        Zq,
+        Uq,
+        Vq,
+        Wq,
+        length=0.1,  # type: ignore[arg-type]
+        normalize=True,
+        color=colors,
+    )
+    mappable = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+    mappable.set_array(speed)
+    fig2.colorbar(mappable, ax=ax2, shrink=0.7, pad=0.1, label="|v|")
     ax2.set_xlabel("x")
     ax2.set_ylabel("y")
     ax2.set_zlabel("z")
