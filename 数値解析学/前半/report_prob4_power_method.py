@@ -19,6 +19,8 @@ from typing import Iterable, Optional
 
 import math
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation, PillowWriter
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 import numpy as np
 from numpy.typing import NDArray
 
@@ -212,7 +214,7 @@ def plot_residual_ratio(
     ax.set_xlabel("$k$")
     ax.set_xlim(1, 10)
     ax.set_ylabel(r"$\|r_k\|/\|r_{k-1}\|$")
-    ax.set_title("Residual Norm Ratio per Step")
+    ax.set_title("Power Method")
     ax.grid(True, linestyle="--", alpha=0.4)
     fig.tight_layout()
     ax.legend()
@@ -252,6 +254,105 @@ def plot_step_results(
     plt.close(fig)
 
 
+def animate_convergence(
+    path: Path, series: Iterable[tuple[str, list[StepResult]]], x_true: FloatVec
+) -> None:
+    series_list = list(series)
+    max_k = max((len(results) for _, results in series_list), default=0)
+    if max_k == 0:
+        return
+
+    fig = plt.figure(figsize=(6, 6))
+    ax = fig.add_subplot(111, projection="3d")
+    ax.set_xlabel(r"$x_1$")
+    ax.set_ylabel(r"$x_2$")
+    ax.set_zlabel(r"$x_3$")
+    ax.set_title("Power Method")
+
+    xs_all: list[float] = [0.0, float(x_true[0])]
+    ys_all: list[float] = [0.0, float(x_true[1])]
+    zs_all: list[float] = [0.0, float(x_true[2])]
+    for _, results in series_list:
+        xs_all.extend(float(r.x[0]) for r in results)
+        ys_all.extend(float(r.x[1]) for r in results)
+        zs_all.extend(float(r.x[2]) for r in results)
+    x_min, x_max = min(xs_all), max(xs_all)
+    y_min, y_max = min(ys_all), max(ys_all)
+    z_min, z_max = min(zs_all), max(zs_all)
+    pad = 0.1
+    ax.set_xlim(x_min - pad, x_max + pad)
+    ax.set_ylim(y_min - pad, y_max + pad)
+    ax.set_zlim(z_min - pad, z_max + pad)
+
+    lines = []
+    points = []
+    colors: list[str] = []
+    for label, _ in series_list:
+        (line,) = ax.plot([], [], [], label=label, linewidth=1.5)
+        color = line.get_color()
+        (point,) = ax.plot(
+            [],
+            [],
+            [],
+            marker="^",
+            linestyle="None",
+            color=color,
+            markersize=10,
+            markerfacecolor="none",
+            markeredgewidth=1.8,
+        )
+        lines.append(line)
+        points.append(point)
+        colors.append(color)
+
+    ax.plot(
+        [float(x_true[0])],
+        [float(x_true[1])],
+        [float(x_true[2])],
+        marker="*",
+        markersize=10,
+        color="black",
+        label="x_true",
+    )
+    ax.legend()
+
+    quivers: list[object] = []
+
+    def update(frame: int):
+        k_max = frame + 1
+        for q in quivers:
+            q.remove()
+        quivers.clear()
+        for idx, (_, results) in enumerate(series_list):
+            xs = [float(r.x[0]) for r in results[:k_max]]
+            ys = [float(r.x[1]) for r in results[:k_max]]
+            zs = [float(r.x[2]) for r in results[:k_max]]
+            lines[idx].set_data(xs, ys)
+            lines[idx].set_3d_properties(zs)
+            if xs:
+                points[idx].set_data([xs[-1]], [ys[-1]])
+                points[idx].set_3d_properties([zs[-1]])
+                quivers.append(
+                    ax.quiver(
+                        0.0,
+                        0.0,
+                        0.0,
+                        xs[-1],
+                        ys[-1],
+                        zs[-1],
+                        color=colors[idx],
+                        arrow_length_ratio=0.2,
+                        linewidth=1.5,
+                    )
+                )
+        return [*lines, *points]
+
+    anim = FuncAnimation(fig, update, frames=max_k, interval=600, blit=False)
+    anim.save(path, writer=PillowWriter(fps=2))
+    plt.show()
+    plt.close(fig)
+
+
 def main() -> None:
     A = make_problem_matrix()
     lam_true, x_true = analytic_solution()
@@ -280,6 +381,8 @@ def main() -> None:
     plot_residual_ratio(plot_path, series)
     steps_path = Path(__file__).resolve().parent / "report_prob4_power_method_steps.png"
     plot_step_results(steps_path, series, lam_true)
+    anim_path = Path(__file__).resolve().parent / "report_prob4_power_method_anim.gif"
+    animate_convergence(anim_path, series, x_true)
 
 
 if __name__ == "__main__":
