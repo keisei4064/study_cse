@@ -291,14 +291,16 @@ def main() -> None:
     out_dir = Path(__file__).resolve().parent
 
     fig_offdiag = plt.figure()
-    plt.semilogy(xs, ys)  # 対数で見ると収束の性質が分かる
+    plt.semilogy(xs, ys, marker="o", markersize=5)  # 対数で見ると収束の性質が分かる
     plt.xlabel(r"$i$")
     plt.ylabel("offdiag Frobenius norm")
     plt.title("Jacobi method convergence")
     plt.grid(True)
     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
     plt.xlim(1, len(xs))
-    fig_offdiag.savefig(out_dir / "jacobi_offdiag_convergence.png", dpi=150)
+    fig_offdiag.savefig(
+        out_dir / "report_prob5_jacobi_method_offdiag_convergence.png", dpi=150
+    )
 
     ys_eigs = np.array(evals_hist)
     xs_eigs = list(range(1, len(ys_eigs) + 1))
@@ -311,6 +313,8 @@ def main() -> None:
             ys_eigs[:, i],
             color=colors[i],
             label=rf"$\lambda_{{{i + 1}}}(i)$",
+            marker="o",
+            markersize=5,
         )
     for i, v in enumerate(evals_true_sorted.tolist()):
         plt.axhline(
@@ -327,7 +331,9 @@ def main() -> None:
     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
     plt.xlim(1, len(xs_eigs))
     plt.gcf().subplots_adjust(right=0.7)
-    fig_eigs.savefig(out_dir / "jacobi_eigen_convergence.png", dpi=150)
+    fig_eigs.savefig(
+        out_dir / "report_prob5_jacobi_method_eigen_convergence.png", dpi=150
+    )
 
     fig, ax = plt.subplots()
     vmax = float(np.max(np.abs(mats_hist[0])))
@@ -370,7 +376,11 @@ def main() -> None:
     ani = animation.FuncAnimation(
         fig, update, frames=len(mats_hist), interval=400, blit=False
     )
-    ani.save(out_dir / "jacobi_B_heatmap.gif", writer="pillow", fps=2)
+    ani.save(
+        out_dir / "report_prob5_jacobi_method_B_heatmap.gif",
+        writer="pillow",
+        fps=2,
+    )
 
     n_frames = len(mats_hist)
     n_cols = max(n_frames, 2)
@@ -446,7 +456,7 @@ def main() -> None:
                 )
 
     fig2.suptitle("B heatmaps (top), rotation G (middle), and eigenvectors X (bottom)")
-    fig2.savefig(out_dir / "jacobi_B_G_X_grid.png", dpi=150)
+    fig2.savefig(out_dir / "report_prob5_jacobi_method_B_G_X_grid.png", dpi=150)
     plt.show()
 
 
