@@ -15,21 +15,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Any, Iterable
 
-import math
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
-from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+from mpl_toolkits.mplot3d.art3d import Line3DCollection
 import numpy as np
 from numpy.typing import NDArray
 
 
 FloatVec = NDArray[np.float64]
 FloatMat = NDArray[np.float64]
-
-
-USE_REFERENCE_IMPLEMENTATION: bool = False
 
 
 @dataclass(frozen=True)
@@ -214,7 +210,7 @@ def plot_residual_ratio(
     ax.set_xlabel("$k$")
     ax.set_xlim(1, 10)
     ax.set_ylabel(r"$\|r_k\|/\|r_{k-1}\|$")
-    ax.set_title("Power Method")
+    ax.set_title("Residual Norm Ratio per Step")
     ax.grid(True, linestyle="--", alpha=0.4)
     fig.tight_layout()
     ax.legend()
@@ -286,7 +282,7 @@ def animate_convergence(
 
     lines = []
     points = []
-    colors: list[str] = []
+    colors: list[Any] = []
     for label, _ in series_list:
         (line,) = ax.plot([], [], [], label=label, linewidth=1.5)
         color = line.get_color()
@@ -316,7 +312,7 @@ def animate_convergence(
     )
     ax.legend()
 
-    quivers: list[object] = []
+    quivers: list[Line3DCollection] = []
 
     def update(frame: int):
         k_max = frame + 1
