@@ -31,8 +31,9 @@ from matplotlib.ticker import MaxNLocator
 FloatVec = NDArray[np.float64]
 FloatMat = NDArray[np.float64]
 
-TOL: float = 1e-10
+TOL: float = 1e-6
 MAX_ITERS: int = 20
+MAX_ITERS_CYCLIC: int = 2000
 
 
 @dataclass(frozen=True)
@@ -90,21 +91,38 @@ def max_offdiag_abs(A: FloatMat) -> tuple[float, int, int]:
 
 
 def jacobi_rotation_params(
-    a_pp: float, a_qq: float, a_pq: float
+    a_pp: float,
+    a_qq: float,
+    a_pq: float,
+    method: str = "stable",
 ) -> tuple[float, float]:
     """
     対称行列の (p,q) 成分 a_pq を 0 にする回転の c=cosθ, s=sinθ を返す。
 
-    授業資料の流れに合わせた式：
+    安定な式（高精度版, method="stable"）：
+        tau = (a_qq - a_pp) / (2 a_pq)
+        t = sign(tau) / (|tau| + sqrt(1 + tau^2))
+        c = 1 / sqrt(1 + t^2)
+        s = t c
+
+    授業資料の式（method="atan2"）：
         tan(2θ) = 2 a_pq / (a_pp - a_qq)
         θ = 1/2 atan2(2 a_pq, a_pp - a_qq)
         c = cosθ, s = sinθ
     """
     if a_pq == 0.0:  # 非対角がゼロなら回転不要
         return 1.0, 0.0
-    theta = 0.5 * math.atan2(2.0 * a_pq, a_pp - a_qq)
-    c = math.cos(theta)
-    s = math.sin(theta)
+    if method == "stable":
+        tau = (a_qq - a_pp) / (2.0 * a_pq)
+        t = math.copysign(1.0, tau) / (abs(tau) + math.sqrt(1.0 + tau * tau))
+        c = 1.0 / math.sqrt(1.0 + t * t)
+        s = t * c
+    elif method == "atan2":
+        theta = 0.5 * math.atan2(2.0 * a_pq, a_pp - a_qq)
+        c = math.cos(theta)
+        s = math.sin(theta)
+    else:
+        raise ValueError(f"unknown method: {method}")
     return c, s
 
 
@@ -156,6 +174,7 @@ def jacobi_eigen(
     A0: FloatMat,
     tol: float,
     max_iters: int,
+    pivot: str = "max",
 ) -> tuple[
     FloatVec,
     FloatMat,
@@ -175,21 +194,29 @@ def jacobi_eigen(
       - 各反復の行列（ヒートマップ用）
       - 各反復の回転行列 G（ヒートマップ用）
       - 各反復の固有ベクトル行列 V（ヒートマップ用）
+    pivot:
+      "max" or "cyclic"
     """
     A = A0.astype(np.float64, copy=True)
     n = A.shape[0]
     V = np.eye(n, dtype=np.float64)
 
     history: list[JacobiStep] = []
-    evals_history: list[FloatVec] = []
+    evals_history: list[FloatVec] = [np.sort(np.diag(A).copy())]
     mats_history: list[FloatMat] = [A.copy()]
     rotations_history: list[FloatMat] = []
     vecs_history: list[FloatMat] = [V.copy()]
+    pairs = [(i, j) for i in range(n) for j in range(i + 1, n)]
 
     for it in range(1, max_iters + 1):
-        maxv, p, q = max_offdiag_abs(A)
+        if pivot == "max":
+            maxv, p, q = max_offdiag_abs(A)
+        elif pivot == "cyclic":
+            p, q = pairs[(it - 1) % len(pairs)]
+            maxv, _, _ = max_offdiag_abs(A)
+        else:
+            raise ValueError(f"unknown pivot strategy: {pivot}")
         off_f = offdiag_frobenius_norm(A)
-        evals_history.append(np.sort(np.diag(A).copy()))
 
         history.append(
             JacobiStep(
@@ -220,6 +247,7 @@ def jacobi_eigen(
         apply_jacobi_rotation(A, V, p, q)
         mats_history.append(A.copy())
         vecs_history.append(V.copy())
+        evals_history.append(np.sort(np.diag(A).copy()))
 
     evals = np.diag(A).copy()
     return (
@@ -242,20 +270,36 @@ def main() -> None:
     B = make_matrix_B()
     evals_true = analytic_eigenvalues()
 
-    evals, evecs, hist, evals_hist, mats_hist, rots_hist, vecs_hist = jacobi_eigen(
-        B, tol=TOL, max_iters=MAX_ITERS
-    )
-    evals, evecs = sort_eigs(evals, evecs)
+    (
+        evals_max,
+        evecs_max,
+        hist_max,
+        evals_hist_max,
+        mats_hist_max,
+        rots_hist_max,
+        vecs_hist_max,
+    ) = jacobi_eigen(B, tol=TOL, max_iters=MAX_ITERS, pivot="max")
+    (
+        evals_cyc,
+        evecs_cyc,
+        hist_cyc,
+        evals_hist_cyc,
+        mats_hist_cyc,
+        rots_hist_cyc,
+        vecs_hist_cyc,
+    ) = jacobi_eigen(B, tol=TOL, max_iters=MAX_ITERS_CYCLIC, pivot="cyclic")
+    evals_max, evecs_max = sort_eigs(evals_max, evecs_max)
 
     # 解析解もソート
     evals_true_sorted = np.sort(evals_true)
 
     print("=== Jacobi method result ===")
     print(f"tol = {TOL:g}, max_iters = {MAX_ITERS}")
-    print(f"iterations = {hist[-1].it if hist else 0}")
+    print(f"iterations (max pivot) = {hist_max[-1].it if hist_max else 0}")
+    print(f"iterations (cyclic) = {hist_cyc[-1].it if hist_cyc else 0}")
     print()
     print("computed eigenvalues:")
-    for v in evals.tolist():
+    for v in evals_max.tolist():
         print(f"  {v:.12f}")
     print()
     print("analytic eigenvalues (given):")
@@ -264,9 +308,9 @@ def main() -> None:
     print()
 
     # 比較（対応付け：ソート順でOK）
-    diff = evals - evals_true_sorted
+    diff = evals_max - evals_true_sorted
     print("abs error vs analytic (sorted pairing):")
-    for i in range(len(evals)):
+    for i in range(len(evals_max)):
         print(f"  |Δλ[{i}]| = {abs(float(diff[i])):.3e}")
 
     # 性能評価のためのログ出力（最初の数行と最後）
@@ -274,36 +318,53 @@ def main() -> None:
     print("=== Convergence log (selected) ===")
     print(f"{'it':>5} | {'p':>2} {'q':>2} | {'|A[p,q]|':>10} | {'offdiag_F':>12}")
     print("-" * 46)
-    show_head = min(10, len(hist))
-    for r in hist[:show_head]:
+    show_head = min(10, len(hist_max))
+    for r in hist_max[:show_head]:
         print(
             f"{r.it:>5d} | {r.p:>2d} {r.q:>2d} | {abs(r.a_pq_before):>10.3e} | {r.offdiag_fro:>12.3e}"
         )
-    if len(hist) > show_head:
-        r = hist[-1]
+    if len(hist_max) > show_head:
+        r = hist_max[-1]
         print("  ...")
         print(
             f"{r.it:>5d} | {r.p:>2d} {r.q:>2d} | {abs(r.a_pq_before):>10.3e} | {r.offdiag_fro:>12.3e}"
         )
 
-    ys = [h.offdiag_fro for h in hist]
-    xs = list(range(1, len(ys) + 1))
+    ys_max = [h.offdiag_fro for h in hist_max]
+    xs_max = list(range(1, len(ys_max) + 1))
+    ys_cyc = [h.offdiag_fro for h in hist_cyc]
+    xs_cyc = list(range(1, len(ys_cyc) + 1))
     out_dir = Path(__file__).resolve().parent
 
     fig_offdiag = plt.figure()
-    plt.semilogy(xs, ys, marker="o", markersize=5)  # 対数で見ると収束の性質が分かる
-    plt.xlabel(r"$i$")
+    plt.semilogy(
+        xs_max,
+        ys_max,
+        marker="o",
+        markersize=5,
+        label="max pivot",
+    )  # 対数で見ると収束の性質が分かる
+    plt.semilogy(
+        xs_cyc,
+        ys_cyc,
+        marker="s",
+        markersize=5,
+        linestyle="--",
+        label="cyclic",
+    )
+    plt.xlabel(r"$i$ (iteration step)")
     plt.ylabel("offdiag Frobenius norm")
-    plt.title("Jacobi method convergence")
+    plt.title("Off-diagonal Frobenius norm convergence")
+    plt.legend()
     plt.grid(True)
     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
-    plt.xlim(1, len(xs))
+    plt.xlim(1, max(len(xs_max), len(xs_cyc)))
     fig_offdiag.savefig(
         out_dir / "report_prob5_jacobi_method_offdiag_convergence.png", dpi=150
     )
 
-    ys_eigs = np.array(evals_hist)
-    xs_eigs = list(range(1, len(ys_eigs) + 1))
+    ys_eigs = np.array(evals_hist_max)
+    xs_eigs = list(range(len(ys_eigs)))
     fig_eigs = plt.figure()
     cmap = plt.get_cmap("tab10")
     colors = cmap(np.linspace(0, 1, ys_eigs.shape[1]))
@@ -329,33 +390,65 @@ def main() -> None:
     plt.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), borderaxespad=0.0)
     plt.grid(True)
     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
-    plt.xlim(1, len(xs_eigs))
+    plt.xlim(0, len(xs_eigs) - 1)
     plt.gcf().subplots_adjust(right=0.7)
     fig_eigs.savefig(
         out_dir / "report_prob5_jacobi_method_eigen_convergence.png", dpi=150
     )
 
+    ys_eigs_cyc = np.array(evals_hist_cyc)
+    xs_eigs_cyc = list(range(len(ys_eigs_cyc)))
+    fig_eigs_cyc = plt.figure()
+    colors_cyc = cmap(np.linspace(0, 1, ys_eigs_cyc.shape[1]))
+    for i in range(ys_eigs_cyc.shape[1]):
+        plt.plot(
+            xs_eigs_cyc,
+            ys_eigs_cyc[:, i],
+            color=colors_cyc[i],
+            label=rf"$\lambda_{{{i + 1}}}(i)$",
+            marker="o",
+            markersize=5,
+        )
+    for i, v in enumerate(evals_true_sorted.tolist()):
+        plt.axhline(
+            v,
+            linestyle="--",
+            color=colors_cyc[i],
+            linewidth=1.0,
+            label=rf"$\lambda_{{{i + 1}}}$ (analytic)",
+        )
+    plt.xlabel(r"$i$ (iteration step)")
+    plt.ylabel(r"$\lambda$ (eigenvalue)")
+    plt.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), borderaxespad=0.0)
+    plt.grid(True)
+    plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.xlim(0, len(xs_eigs_cyc) - 1)
+    plt.gcf().subplots_adjust(right=0.7)
+    fig_eigs_cyc.savefig(
+        out_dir / "report_prob5_jacobi_method_eigen_convergence_cyclic.png", dpi=150
+    )
+
     fig, ax = plt.subplots()
-    vmax = float(np.max(np.abs(mats_hist[0])))
-    im = ax.imshow(mats_hist[0], vmin=-vmax, vmax=vmax, cmap="coolwarm")
+    vmax = float(np.max(np.abs(mats_hist_max[0])))
+    im = ax.imshow(mats_hist_max[0], vmin=-vmax, vmax=vmax, cmap="coolwarm")
     fig.colorbar(im, ax=ax)
     ax.set_title("B heatmap (i=0)")
-    ax.set_xticks(range(mats_hist[0].shape[1]))
-    ax.set_yticks(range(mats_hist[0].shape[0]))
-    ax.set_xticklabels([str(i + 1) for i in range(mats_hist[0].shape[1])])
-    ax.set_yticklabels([str(i + 1) for i in range(mats_hist[0].shape[0])])
+    ax.set_xticks(range(mats_hist_max[0].shape[1]))
+    ax.set_yticks(range(mats_hist_max[0].shape[0]))
+    ax.set_xticklabels([str(i + 1) for i in range(mats_hist_max[0].shape[1])])
+    ax.set_yticklabels([str(i + 1) for i in range(mats_hist_max[0].shape[0])])
     ax.set_xlabel("column")
     ax.set_ylabel("row")
 
     texts: list[list[Text]] = []
-    for i in range(mats_hist[0].shape[0]):
+    for i in range(mats_hist_max[0].shape[0]):
         row: list[Text] = []
-        for j in range(mats_hist[0].shape[1]):
+        for j in range(mats_hist_max[0].shape[1]):
             row.append(
                 ax.text(
                     j,
                     i,
-                    f"{mats_hist[0][i, j]:.2f}",
+                    f"{mats_hist_max[0][i, j]:.2f}",
                     ha="center",
                     va="center",
                     color="black",
@@ -365,7 +458,7 @@ def main() -> None:
         texts.append(row)
 
     def update(frame: int):
-        data = mats_hist[frame]
+        data = mats_hist_max[frame]
         im.set_data(data)
         ax.set_title(f"B heatmap (i={frame})")
         for i in range(data.shape[0]):
@@ -374,7 +467,7 @@ def main() -> None:
         return [im]
 
     ani = animation.FuncAnimation(
-        fig, update, frames=len(mats_hist), interval=400, blit=False
+        fig, update, frames=len(mats_hist_max), interval=400, blit=False
     )
     ani.save(
         out_dir / "report_prob5_jacobi_method_B_heatmap.gif",
@@ -382,17 +475,66 @@ def main() -> None:
         fps=2,
     )
 
-    n_frames = len(mats_hist)
+    fig_cyc, ax_cyc = plt.subplots()
+    vmax_cyc = float(np.max(np.abs(mats_hist_cyc[0])))
+    im_cyc = ax_cyc.imshow(
+        mats_hist_cyc[0], vmin=-vmax_cyc, vmax=vmax_cyc, cmap="coolwarm"
+    )
+    fig_cyc.colorbar(im_cyc, ax=ax_cyc)
+    ax_cyc.set_title("B heatmap (cyclic, i=0)")
+    ax_cyc.set_xticks(range(mats_hist_cyc[0].shape[1]))
+    ax_cyc.set_yticks(range(mats_hist_cyc[0].shape[0]))
+    ax_cyc.set_xticklabels([str(i + 1) for i in range(mats_hist_cyc[0].shape[1])])
+    ax_cyc.set_yticklabels([str(i + 1) for i in range(mats_hist_cyc[0].shape[0])])
+    ax_cyc.set_xlabel("column")
+    ax_cyc.set_ylabel("row")
+
+    texts_cyc: list[list[Text]] = []
+    for i in range(mats_hist_cyc[0].shape[0]):
+        row_cyc: list[Text] = []
+        for j in range(mats_hist_cyc[0].shape[1]):
+            row_cyc.append(
+                ax_cyc.text(
+                    j,
+                    i,
+                    f"{mats_hist_cyc[0][i, j]:.2f}",
+                    ha="center",
+                    va="center",
+                    color="black",
+                    fontsize=8,
+                )
+            )
+        texts_cyc.append(row_cyc)
+
+    def update_cyc(frame: int):
+        data_cyc = mats_hist_cyc[frame]
+        im_cyc.set_data(data_cyc)
+        ax_cyc.set_title(f"B heatmap (cyclic, i={frame})")
+        for i in range(data_cyc.shape[0]):
+            for j in range(data_cyc.shape[1]):
+                texts_cyc[i][j].set_text(f"{data_cyc[i, j]:.2f}")
+        return [im_cyc]
+
+    ani_cyc = animation.FuncAnimation(
+        fig_cyc, update_cyc, frames=len(mats_hist_cyc), interval=400, blit=False
+    )
+    ani_cyc.save(
+        out_dir / "report_prob5_jacobi_method_B_heatmap_cyclic.gif",
+        writer="pillow",
+        fps=2,
+    )
+
+    n_frames = len(mats_hist_max)
     n_cols = max(n_frames, 2)
     fig2 = plt.figure(
         figsize=(2.8 * n_cols, 8.4),
         constrained_layout=True,
     )
     gs = fig2.add_gridspec(3, n_cols, height_ratios=[1, 1, 1])
-    vmax2 = float(np.max(np.abs(mats_hist[0])))
+    vmax2 = float(np.max(np.abs(mats_hist_max[0])))
     for i in range(n_frames):
         ax2 = fig2.add_subplot(gs[0, i])
-        data2 = mats_hist[i]
+        data2 = mats_hist_max[i]
         ax2.imshow(data2, vmin=-vmax2, vmax=vmax2, cmap="coolwarm")
         ax2.set_title(f"B (i={i})")
         ax2.set_xticks([])
@@ -411,7 +553,7 @@ def main() -> None:
                     fontsize=8,
                 )
 
-    g_mats = rots_hist[:2]
+    g_mats = rots_hist_max[:2]
     vmax_g = 1.0
     for i, g_mat in enumerate(g_mats):
         axg = fig2.add_subplot(gs[1, i])
@@ -433,10 +575,10 @@ def main() -> None:
                     fontsize=8,
                 )
 
-    vmax_x = float(np.max(np.abs(vecs_hist[0])))
+    vmax_x = float(np.max(np.abs(vecs_hist_max[0])))
     for i in range(n_frames):
         axx = fig2.add_subplot(gs[2, i])
-        x_mat = vecs_hist[i]
+        x_mat = vecs_hist_max[i]
         axx.imshow(x_mat, vmin=-vmax_x, vmax=vmax_x, cmap="coolwarm")
         axx.set_title(f"X (i={i})")
         axx.set_xticks([])
