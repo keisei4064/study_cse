@@ -224,6 +224,7 @@ def plot_assumption_grids(
     x = np.arange(len(zprime_vals) + 1)
     y = np.arange(len(uprime0_vals) + 1)
     im = plt.pcolormesh(x, y, max_err_grid, shading="flat")
+    plt.gca().set_aspect("equal", adjustable="box")
     plt.colorbar(im, label=r"$\max |y - y_{\mathrm{base}}|$")
     plt.xticks(np.arange(len(zprime_vals)) + 0.5, [f"{v:g}" for v in zprime_vals])
     plt.yticks(np.arange(len(uprime0_vals)) + 0.5, [f"{v:g}" for v in uprime0_vals])
@@ -231,6 +232,9 @@ def plot_assumption_grids(
     plt.ylabel(r"$u'(0)$")
     for i, uprime0 in enumerate(uprime0_vals):
         for j, zprime0 in enumerate(zprime_vals):
+            rgba = im.cmap(im.norm(max_err_grid[i, j]))
+            luminance = 0.2126 * rgba[0] + 0.7152 * rgba[1] + 0.0722 * rgba[2]
+            text_color = "white" if luminance < 0.5 else "black"
             plt.text(
                 j + 0.5,
                 i + 0.5,
@@ -238,7 +242,7 @@ def plot_assumption_grids(
                 ha="center",
                 va="center",
                 fontsize=8,
-                color="black",
+                color=text_color,
             )
     plt.grid(False)
     plt.savefig(
@@ -251,16 +255,20 @@ def plot_assumption_grids(
     max_abs_c = float(np.max(np.abs(c_grid)))
     norm_c = colors.SymLogNorm(linthresh=1e-6, vmin=-max_abs_c, vmax=max_abs_c)
     im = plt.pcolormesh(x, y, c_grid, shading="flat", norm=norm_c)
+    plt.gca().set_aspect("equal", adjustable="box")
     cbar = plt.colorbar(im, label="C")
-    tick_vals = [-1e2, -1e1, 0.0, 1e1, 1e2]
+    tick_vals = [-1e1, 0.0, 1e1]
     cbar.set_ticks(tick_vals)
-    cbar.set_ticklabels([r"$-10^2$", r"$-10^1$", "0", r"$10^1$", r"$10^2$"])
+    cbar.set_ticklabels([r"$-10^1$", "0", r"$10^1$"])
     plt.xticks(np.arange(len(zprime_vals)) + 0.5, [f"{v:g}" for v in zprime_vals])
     plt.yticks(np.arange(len(uprime0_vals)) + 0.5, [f"{v:g}" for v in uprime0_vals])
     plt.xlabel(r"$z'(0)$")
     plt.ylabel(r"$u'(0)$")
     for i, uprime0 in enumerate(uprime0_vals):
         for j, zprime0 in enumerate(zprime_vals):
+            rgba = im.cmap(im.norm(c_grid[i, j]))
+            luminance = 0.2126 * rgba[0] + 0.7152 * rgba[1] + 0.0722 * rgba[2]
+            text_color = "white" if luminance < 0.5 else "black"
             plt.text(
                 j + 0.5,
                 i + 0.5,
@@ -268,7 +276,7 @@ def plot_assumption_grids(
                 ha="center",
                 va="center",
                 fontsize=8,
-                color="black",
+                color=text_color,
             )
     plt.grid(False)
     plt.savefig(
@@ -318,8 +326,8 @@ def main() -> None:
     plot_result(res, title=f"Superposition + RK4 (h={h:g})")
 
     # 仮定の影響を確認
-    uprime0_vals = [0.0, 1.0, 2.0, 3.0, 4.0]
-    zprime0_vals = [0.01, 0.1, 1.0, 10.0, 100.0]
+    uprime0_vals = [0.0, 1.0, 2.0]
+    zprime0_vals = [0.1, 1.0, 10.0]
     compare_assumptions(
         h,
         uprime0_list=uprime0_vals,
