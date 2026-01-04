@@ -17,11 +17,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import math
 import numpy as np
 from numpy.typing import NDArray
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from matplotlib.text import Text
 from matplotlib.ticker import MaxNLocator
 
 
@@ -153,7 +156,15 @@ def jacobi_eigen(
     A0: FloatMat,
     tol: float,
     max_iters: int,
-) -> tuple[FloatVec, FloatMat, list[JacobiStep], list[FloatVec]]:
+) -> tuple[
+    FloatVec,
+    FloatMat,
+    list[JacobiStep],
+    list[FloatVec],
+    list[FloatMat],
+    list[FloatMat],
+    list[FloatMat],
+]:
     """
     1回転=1ステップで収束まで回すヤコビ法。
     戻り値：
@@ -161,6 +172,9 @@ def jacobi_eigen(
         - 固有ベクトル行列 V（列が固有ベクトル）
       - 収束過程（性能評価用ログ）
       - 各反復の固有値推移（対角成分）
+      - 各反復の行列（ヒートマップ用）
+      - 各反復の回転行列 G（ヒートマップ用）
+      - 各反復の固有ベクトル行列 V（ヒートマップ用）
     """
     A = A0.astype(np.float64, copy=True)
     n = A.shape[0]
@@ -168,6 +182,9 @@ def jacobi_eigen(
 
     history: list[JacobiStep] = []
     evals_history: list[FloatVec] = []
+    mats_history: list[FloatMat] = [A.copy()]
+    rotations_history: list[FloatMat] = []
+    vecs_history: list[FloatMat] = [V.copy()]
 
     for it in range(1, max_iters + 1):
         maxv, p, q = max_offdiag_abs(A)
@@ -189,10 +206,31 @@ def jacobi_eigen(
         if maxv < tol:
             break
 
+        a_pp = float(A[p, p])
+        a_qq = float(A[q, q])
+        a_pq = float(A[p, q])
+        c, s = jacobi_rotation_params(a_pp, a_qq, a_pq)
+        G = np.eye(n, dtype=np.float64)
+        G[p, p] = c
+        G[q, q] = c
+        G[p, q] = s
+        G[q, p] = -s
+        rotations_history.append(G)
+
         apply_jacobi_rotation(A, V, p, q)
+        mats_history.append(A.copy())
+        vecs_history.append(V.copy())
 
     evals = np.diag(A).copy()
-    return evals, V, history, evals_history
+    return (
+        evals,
+        V,
+        history,
+        evals_history,
+        mats_history,
+        rotations_history,
+        vecs_history,
+    )
 
 
 def sort_eigs(evals: FloatVec, evecs: FloatMat) -> tuple[FloatVec, FloatMat]:
@@ -204,7 +242,7 @@ def main() -> None:
     B = make_matrix_B()
     evals_true = analytic_eigenvalues()
 
-    evals, evecs, hist, evals_hist = jacobi_eigen(
+    evals, evecs, hist, evals_hist, mats_hist, rots_hist, vecs_hist = jacobi_eigen(
         B, tol=TOL, max_iters=MAX_ITERS
     )
     evals, evecs = sort_eigs(evals, evecs)
@@ -250,7 +288,9 @@ def main() -> None:
 
     ys = [h.offdiag_fro for h in hist]
     xs = list(range(1, len(ys) + 1))
-    plt.figure()
+    out_dir = Path(__file__).resolve().parent
+
+    fig_offdiag = plt.figure()
     plt.semilogy(xs, ys)  # 対数で見ると収束の性質が分かる
     plt.xlabel(r"$i$")
     plt.ylabel("offdiag Frobenius norm")
@@ -258,10 +298,11 @@ def main() -> None:
     plt.grid(True)
     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
     plt.xlim(1, len(xs))
+    fig_offdiag.savefig(out_dir / "jacobi_offdiag_convergence.png", dpi=150)
 
     ys_eigs = np.array(evals_hist)
     xs_eigs = list(range(1, len(ys_eigs) + 1))
-    plt.figure()
+    fig_eigs = plt.figure()
     cmap = plt.get_cmap("tab10")
     colors = cmap(np.linspace(0, 1, ys_eigs.shape[1]))
     for i in range(ys_eigs.shape[1]):
@@ -269,7 +310,7 @@ def main() -> None:
             xs_eigs,
             ys_eigs[:, i],
             color=colors[i],
-            label=rf"$\lambda_{{{i+1}}}(i)$",
+            label=rf"$\lambda_{{{i + 1}}}(i)$",
         )
     for i, v in enumerate(evals_true_sorted.tolist()):
         plt.axhline(
@@ -277,15 +318,135 @@ def main() -> None:
             linestyle="--",
             color=colors[i],
             linewidth=1.0,
-            label=rf"$\lambda_{{{i+1}}}$ (analytic)",
+            label=rf"$\lambda_{{{i + 1}}}$ (analytic)",
         )
     plt.xlabel(r"$i$ (iteration step)")
-    plt.ylabel(r"$\lambda$ (sorted eigenvalue)")
+    plt.ylabel(r"$\lambda$ (eigenvalue)")
     plt.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), borderaxespad=0.0)
     plt.grid(True)
     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
     plt.xlim(1, len(xs_eigs))
     plt.gcf().subplots_adjust(right=0.7)
+    fig_eigs.savefig(out_dir / "jacobi_eigen_convergence.png", dpi=150)
+
+    fig, ax = plt.subplots()
+    vmax = float(np.max(np.abs(mats_hist[0])))
+    im = ax.imshow(mats_hist[0], vmin=-vmax, vmax=vmax, cmap="coolwarm")
+    fig.colorbar(im, ax=ax)
+    ax.set_title("B heatmap (i=0)")
+    ax.set_xticks(range(mats_hist[0].shape[1]))
+    ax.set_yticks(range(mats_hist[0].shape[0]))
+    ax.set_xticklabels([str(i + 1) for i in range(mats_hist[0].shape[1])])
+    ax.set_yticklabels([str(i + 1) for i in range(mats_hist[0].shape[0])])
+    ax.set_xlabel("column")
+    ax.set_ylabel("row")
+
+    texts: list[list[Text]] = []
+    for i in range(mats_hist[0].shape[0]):
+        row: list[Text] = []
+        for j in range(mats_hist[0].shape[1]):
+            row.append(
+                ax.text(
+                    j,
+                    i,
+                    f"{mats_hist[0][i, j]:.2f}",
+                    ha="center",
+                    va="center",
+                    color="black",
+                    fontsize=8,
+                )
+            )
+        texts.append(row)
+
+    def update(frame: int):
+        data = mats_hist[frame]
+        im.set_data(data)
+        ax.set_title(f"B heatmap (i={frame})")
+        for i in range(data.shape[0]):
+            for j in range(data.shape[1]):
+                texts[i][j].set_text(f"{data[i, j]:.2f}")
+        return [im]
+
+    ani = animation.FuncAnimation(
+        fig, update, frames=len(mats_hist), interval=400, blit=False
+    )
+    ani.save(out_dir / "jacobi_B_heatmap.gif", writer="pillow", fps=2)
+
+    n_frames = len(mats_hist)
+    n_cols = max(n_frames, 2)
+    fig2 = plt.figure(
+        figsize=(2.8 * n_cols, 8.4),
+        constrained_layout=True,
+    )
+    gs = fig2.add_gridspec(3, n_cols, height_ratios=[1, 1, 1])
+    vmax2 = float(np.max(np.abs(mats_hist[0])))
+    for i in range(n_frames):
+        ax2 = fig2.add_subplot(gs[0, i])
+        data2 = mats_hist[i]
+        ax2.imshow(data2, vmin=-vmax2, vmax=vmax2, cmap="coolwarm")
+        ax2.set_title(f"B (i={i})")
+        ax2.set_xticks([])
+        ax2.set_yticks([])
+        if i == 0:
+            ax2.set_ylabel("B")
+        for r in range(data2.shape[0]):
+            for c in range(data2.shape[1]):
+                ax2.text(
+                    c,
+                    r,
+                    f"{data2[r, c]:.2f}",
+                    ha="center",
+                    va="center",
+                    color="black",
+                    fontsize=8,
+                )
+
+    g_mats = rots_hist[:2]
+    vmax_g = 1.0
+    for i, g_mat in enumerate(g_mats):
+        axg = fig2.add_subplot(gs[1, i])
+        axg.imshow(g_mat, vmin=-vmax_g, vmax=vmax_g, cmap="coolwarm")
+        axg.set_title(f"G (i={i + 1})")
+        axg.set_xticks([])
+        axg.set_yticks([])
+        if i == 0:
+            axg.set_ylabel("rotation G")
+        for r in range(g_mat.shape[0]):
+            for c in range(g_mat.shape[1]):
+                axg.text(
+                    c,
+                    r,
+                    f"{g_mat[r, c]:.2f}",
+                    ha="center",
+                    va="center",
+                    color="black",
+                    fontsize=8,
+                )
+
+    vmax_x = float(np.max(np.abs(vecs_hist[0])))
+    for i in range(n_frames):
+        axx = fig2.add_subplot(gs[2, i])
+        x_mat = vecs_hist[i]
+        axx.imshow(x_mat, vmin=-vmax_x, vmax=vmax_x, cmap="coolwarm")
+        axx.set_title(f"X (i={i})")
+        axx.set_xticks([])
+        axx.set_yticks([])
+        if i == 0:
+            axx.set_ylabel("eigenvectors X")
+        for r in range(x_mat.shape[0]):
+            for c in range(x_mat.shape[1]):
+                axx.text(
+                    c,
+                    r,
+                    f"{x_mat[r, c]:.2f}",
+                    ha="center",
+                    va="center",
+                    color="black",
+                    fontsize=8,
+                )
+
+    fig2.suptitle("B heatmaps (top), rotation G (middle), and eigenvectors X (bottom)")
+    fig2.savefig(out_dir / "jacobi_B_G_X_grid.png", dpi=150)
     plt.show()
 
 
