@@ -207,33 +207,34 @@ def plot_assumption_grids(
     zprime_vals = np.asarray(zprime_list, dtype=float)
     max_err_grid = np.zeros((len(uprime0_vals), len(zprime_vals)), dtype=float)
     c_grid = np.zeros((len(uprime0_vals), len(zprime_vals)), dtype=float)
+    baseline = solve_bvp_superposition(h, uprime0=0.0, zprime0=1.0)
+    baseline_y = np.asarray(baseline.y_num, dtype=float)
 
     for i, uprime0 in enumerate(uprime0_vals):
         for j, zprime0 in enumerate(zprime_vals):
             res = solve_bvp_superposition(
                 h, uprime0=float(uprime0), zprime0=float(zprime0)
             )
-            max_err_grid[i, j] = max(res.abs_err)
+            y_num = np.asarray(res.y_num, dtype=float)
+            max_err_grid[i, j] = float(np.max(np.abs(y_num - baseline_y)))
             c_grid[i, j] = res.C
 
     plt.figure()
-    plt.title("Assumption sensitivity (max |error|)")
+    plt.title(r"$\max |y - y_{\mathrm{base}}|$")
     x = np.arange(len(zprime_vals) + 1)
     y = np.arange(len(uprime0_vals) + 1)
-    min_pos = float(np.min(max_err_grid[max_err_grid > 0]))
-    norm_err = colors.LogNorm(vmin=min_pos, vmax=float(np.max(max_err_grid)))
-    im = plt.pcolormesh(x, y, max_err_grid, shading="flat", norm=norm_err)
-    plt.colorbar(im, label="max |error|")
+    im = plt.pcolormesh(x, y, max_err_grid, shading="flat")
+    plt.colorbar(im, label=r"$\max |y - y_{\mathrm{base}}|$")
     plt.xticks(np.arange(len(zprime_vals)) + 0.5, [f"{v:g}" for v in zprime_vals])
     plt.yticks(np.arange(len(uprime0_vals)) + 0.5, [f"{v:g}" for v in uprime0_vals])
-    plt.xlabel("zprime0")
-    plt.ylabel("uprime0")
+    plt.xlabel(r"$z'(0)$")
+    plt.ylabel(r"$u'(0)$")
     for i, uprime0 in enumerate(uprime0_vals):
         for j, zprime0 in enumerate(zprime_vals):
             plt.text(
                 j + 0.5,
                 i + 0.5,
-                f"{max_err_grid[i, j]:.6e}",
+                f"{max_err_grid[i, j]:.3e}",
                 ha="center",
                 va="center",
                 fontsize=8,
@@ -246,15 +247,18 @@ def plot_assumption_grids(
     plt.show()
 
     plt.figure()
-    plt.title("Assumption sensitivity (C)")
+    plt.title("C")
     max_abs_c = float(np.max(np.abs(c_grid)))
     norm_c = colors.SymLogNorm(linthresh=1e-6, vmin=-max_abs_c, vmax=max_abs_c)
     im = plt.pcolormesh(x, y, c_grid, shading="flat", norm=norm_c)
-    plt.colorbar(im, label="C")
+    cbar = plt.colorbar(im, label="C")
+    tick_vals = [-1e2, -1e1, 0.0, 1e1, 1e2]
+    cbar.set_ticks(tick_vals)
+    cbar.set_ticklabels([r"$-10^2$", r"$-10^1$", "0", r"$10^1$", r"$10^2$"])
     plt.xticks(np.arange(len(zprime_vals)) + 0.5, [f"{v:g}" for v in zprime_vals])
     plt.yticks(np.arange(len(uprime0_vals)) + 0.5, [f"{v:g}" for v in uprime0_vals])
-    plt.xlabel("zprime0")
-    plt.ylabel("uprime0")
+    plt.xlabel(r"$z'(0)$")
+    plt.ylabel(r"$u'(0)$")
     for i, uprime0 in enumerate(uprime0_vals):
         for j, zprime0 in enumerate(zprime_vals):
             plt.text(
