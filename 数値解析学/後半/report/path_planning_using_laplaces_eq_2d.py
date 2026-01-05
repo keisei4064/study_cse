@@ -12,6 +12,7 @@ from occupancy_grid_2d import load_layout2d_yaml, rasterize_occupancy_grid_2d
 from plot_laplace_2d import (
     plot_laplace_2d,
     plot_laplace_surface_3d,
+    plot_velocity_quiver_2d,
     plot_residual_history,
 )
 
@@ -32,6 +33,8 @@ class SolveMethod(Enum):
 @dataclass(frozen=True)
 class SolveResult:
     phi: FloatArray
+    u: FloatArray
+    v: FloatArray
     iterations: int
     residual_history: list[float]
     residual_norm_history: list[float]
@@ -136,8 +139,28 @@ def solve_laplace(
         if res_norm <= tol:
             break
 
+    u = np.zeros_like(phi)
+    v = np.zeros_like(phi)
+    for i in range(nx):
+        for j in range(ny):
+            im1 = max(i - 1, 0)
+            ip1 = min(i + 1, nx - 1)
+            jm1 = max(j - 1, 0)
+            jp1 = min(j + 1, ny - 1)
+
+            dx1 = xs[ip1] - xs[im1]
+            dy1 = ys[jp1] - ys[jm1]
+            if dx1 == 0.0 or dy1 == 0.0:
+                continue
+
+            # 低ポテンシャル側へ進むので負の勾配を使う
+            u[i, j] = -(phi[ip1, j] - phi[im1, j]) / dx1
+            v[i, j] = -(phi[i, jp1] - phi[i, jm1]) / dy1
+
     return SolveResult(
         phi=phi,
+        u=u,
+        v=v,
         iterations=iterations,
         residual_history=residual_history,
         residual_norm_history=residual_norm_history,
@@ -221,6 +244,7 @@ def main() -> int:
         start=layout.world.start,
         goal=layout.world.goal,
     )
+    _ = plot_velocity_quiver_2d(xs, ys, result.u, result.v)
     _ = plot_laplace_surface_3d(xs, ys, result.phi)
     _ = plot_residual_history(
         result.residual_history,

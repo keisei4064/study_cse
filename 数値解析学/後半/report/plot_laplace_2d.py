@@ -62,6 +62,49 @@ def plot_laplace_2d(
     return ax
 
 
+def plot_velocity_quiver_2d(
+    xs: FloatArray,
+    ys: FloatArray,
+    u: FloatArray,
+    v: FloatArray,
+    *,
+    step: int | None = None,
+    ax=None,
+):
+    import matplotlib.pyplot as plt
+
+    if ax is None:
+        _, ax = plt.subplots()
+
+    stride = step if step is not None else max(1, min(xs.size, ys.size) // 20)
+    uu = u[::stride, ::stride]
+    vv = v[::stride, ::stride]
+    speed = np.sqrt(uu**2 + vv**2)
+    speed_safe = np.where(speed == 0.0, 1.0, speed)
+    uu_unit = uu / speed_safe
+    vv_unit = vv / speed_safe
+
+    grid_scale = 0.5 * min(float(xs[1] - xs[0]), float(ys[1] - ys[0]))
+    q = ax.quiver(
+        xs[::stride],
+        ys[::stride],
+        (uu_unit * grid_scale).T,
+        (vv_unit * grid_scale).T,
+        speed.T,
+        angles="xy",
+        scale_units="xy",
+        scale=1.0,
+        width=0.0025,
+        cmap="viridis",
+    )
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_title("Velocity field (quiver)")
+    ax.set_aspect("equal")
+    plt.colorbar(q, ax=ax, label="|v|")
+    return ax
+
+
 def plot_residual_history(
     residual: Iterable[float],
     residual_norm: Iterable[float],
