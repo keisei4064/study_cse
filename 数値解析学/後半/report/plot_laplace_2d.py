@@ -36,37 +36,78 @@ def plot_laplace_2d(
     import matplotlib.pyplot as plt
 
     if ax is None:
-        _, ax = plt.subplots()
+        _, (ax_lin, ax_log) = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
+    else:
+        ax_lin, ax_log = ax
 
     extent = (xs[0], xs[-1], ys[0], ys[-1])
-    ax.imshow(
+    ax_lin.imshow(
         occ.T,
         origin="lower",
         extent=extent,
         cmap="gray_r",
         interpolation="nearest",
     )
-    ax.contour(xs, ys, phi.T, levels=20, cmap="viridis", alpha=0.7)
+    boundary_mask = np.zeros_like(occ, dtype=bool)
+    boundary_mask[0, :] = True
+    boundary_mask[-1, :] = True
+    boundary_mask[:, 0] = True
+    boundary_mask[:, -1] = True
+    phi_masked = np.ma.masked_array(phi, mask=(occ | boundary_mask))
+    im_lin = ax_lin.imshow(
+        phi_masked.T,
+        origin="lower",
+        extent=extent,
+        cmap="viridis",
+        interpolation="nearest",
+    )
+
+    ax_log.imshow(
+        occ.T,
+        origin="lower",
+        extent=extent,
+        cmap="gray_r",
+        interpolation="nearest",
+    )
+    phi_inv = 1.0 - phi_masked
+    phi_clipped = np.clip(phi_inv, 1.0e-12, None)
+    phi_log = -np.log10(phi_clipped)
+    im_log = ax_log.imshow(
+        phi_log.T,
+        origin="lower",
+        extent=extent,
+        cmap="viridis",
+        interpolation="nearest",
+    )
 
     if path is not None:
         path_x, path_y = _path_to_xy(path, xs, ys)
-        ax.plot(path_x, path_y, color="tab:orange", linewidth=2.0)
+        ax_lin.plot(path_x, path_y, color="tab:orange", linewidth=2.0)
+        ax_log.plot(path_x, path_y, color="tab:orange", linewidth=2.0)
     if path_xy is not None:
         points = list(path_xy)
         if points:
             px = [p[0] for p in points]
             py = [p[1] for p in points]
-            ax.plot(px, py, color="tab:orange", linewidth=2.0)
+            ax_lin.plot(px, py, color="tab:orange", linewidth=2.0)
+            ax_log.plot(px, py, color="tab:orange", linewidth=2.0)
     if start is not None:
-        ax.plot(start[0], start[1], marker="o", markersize=7, color="tab:blue")
+        ax_lin.plot(start[0], start[1], marker="o", markersize=7, color="tab:blue")
+        ax_log.plot(start[0], start[1], marker="o", markersize=7, color="tab:blue")
     if goal is not None:
-        ax.plot(goal[0], goal[1], marker="*", markersize=12, color="tab:red")
+        ax_lin.plot(goal[0], goal[1], marker="*", markersize=12, color="tab:red")
+        ax_log.plot(goal[0], goal[1], marker="*", markersize=12, color="tab:red")
 
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_title("Laplace solution (2D)")
-    ax.set_aspect("equal")
-    return ax
+    ax_lin.set_xlabel("x")
+    ax_lin.set_ylabel("y")
+    ax_lin.set_title("Laplace solution (linear)")
+    ax_lin.set_aspect("equal")
+    plt.colorbar(im_lin, ax=ax_lin, fraction=0.046, pad=0.04)
+    ax_log.set_xlabel("x")
+    ax_log.set_title("Laplace solution (-log10(1 - phi))")
+    ax_log.set_aspect("equal")
+    plt.colorbar(im_log, ax=ax_log, fraction=0.046, pad=0.04)
+    return (ax_lin, ax_log)
 
 
 def plot_velocity_quiver_2d(
@@ -101,7 +142,6 @@ def plot_velocity_quiver_2d(
         extent=extent,
         cmap="gray_r",
         interpolation="nearest",
-        alpha=0.4,
     )
     X = xs[::stride]
     Y = ys[::stride]
@@ -160,11 +200,67 @@ def plot_laplace_surface_3d(
     if ax is None:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
+    else:
+        fig = ax.figure
 
     X, Y = np.meshgrid(xs, ys, indexing="ij")
-    ax.plot_surface(X, Y, phi, cmap="viridis", linewidth=0.0, antialiased=True)
+    surf = ax.plot_surface(X, Y, phi, cmap="viridis", linewidth=0.0, antialiased=True)
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    ax.set_zlabel("phi")
+    ax.set_zlabel("phi", labelpad=8)
     ax.set_title("Laplace potential (3D surface)")
+    fig.colorbar(surf, ax=ax, shrink=0.7, pad=0.15)
     return ax
+
+
+def plot_laplace_surface_3d_log(
+    xs: FloatArray,
+    ys: FloatArray,
+    phi: FloatArray,
+    *,
+    occ: BoolArray | None = None,
+    ax=None,
+):
+    import matplotlib.pyplot as plt
+
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection="3d")
+    else:
+        fig = ax.figure
+
+    X, Y = np.meshgrid(xs, ys, indexing="ij")
+    phi_inv = 1.0 - phi
+    if occ is not None:
+        boundary_mask = np.zeros_like(occ, dtype=bool)
+        boundary_mask[0, :] = True
+        boundary_mask[-1, :] = True
+        boundary_mask[:, 0] = True
+        boundary_mask[:, -1] = True
+        phi_inv = np.ma.masked_array(phi_inv, mask=(occ | boundary_mask))
+    phi_log = -np.log10(np.clip(phi_inv, 1.0e-12, None))
+    surf = ax.plot_surface(X, Y, phi_log, cmap="viridis", linewidth=0.0, antialiased=True)
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("-log10(1 - phi)", labelpad=8)
+    ax.set_title("Laplace potential (3D surface, -log10(1 - phi))")
+    fig.colorbar(surf, ax=ax, shrink=0.7, pad=0.15)
+    return ax
+
+
+def plot_laplace_surface_3d_pair(
+    xs: FloatArray,
+    ys: FloatArray,
+    phi: FloatArray,
+    *,
+    occ: BoolArray | None = None,
+):
+    import matplotlib.pyplot as plt
+
+    fig = plt.figure(figsize=(10, 4))
+    ax_lin = fig.add_subplot(1, 2, 1, projection="3d")
+    ax_log = fig.add_subplot(1, 2, 2, projection="3d")
+    plot_laplace_surface_3d(xs, ys, phi, ax=ax_lin)
+    plot_laplace_surface_3d_log(xs, ys, phi, occ=occ, ax=ax_log)
+    fig.tight_layout()
+    return ax_lin, ax_log
