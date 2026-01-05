@@ -20,6 +20,7 @@ class World2D:
     ny: int
     start: Tuple[float, float] | None = None
     goal: Tuple[float, float] | None = None
+    goal_radius: float | None = None
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,7 @@ def _to_world2d(
     *,
     start_raw: Any | None = None,
     goal_raw: Any | None = None,
+    goal_radius_raw: Any | None = None,
 ) -> World2D:
     xlim_raw = world["xlim"]
     ylim_raw = world["ylim"]
@@ -79,12 +81,19 @@ def _to_world2d(
         start_raw = world.get("start")
     if goal_raw is None:
         goal_raw = world.get("goal")
+    if goal_radius_raw is None:
+        goal_radius_raw = world.get("goal_radius")
     start = None
     if start_raw is not None:
         start = _parse_point(start_raw, xlim=(x0, x1), ylim=(y0, y1), name="start")
     goal = None
     if goal_raw is not None:
         goal = _parse_point(goal_raw, xlim=(x0, x1), ylim=(y0, y1), name="goal")
+    goal_radius = None
+    if goal_radius_raw is not None:
+        goal_radius = float(goal_radius_raw)
+        if goal_radius < 0.0:
+            raise ValueError("goal_radius must be >= 0")
 
     return World2D(
         xlim=(x0, x1),
@@ -93,6 +102,7 @@ def _to_world2d(
         ny=ny,
         start=start,
         goal=goal,
+        goal_radius=goal_radius,
     )
 
 
@@ -124,6 +134,7 @@ def load_layout2d_yaml(path: str | Path) -> Layout2D:
         data["world"],
         start_raw=data.get("start"),
         goal_raw=data.get("goal"),
+        goal_radius_raw=data.get("goal_radius"),
     )
     obstacles_raw = data.get("obstacles", [])
     if not isinstance(obstacles_raw, list):

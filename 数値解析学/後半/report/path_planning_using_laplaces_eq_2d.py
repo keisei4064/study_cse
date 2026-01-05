@@ -78,8 +78,12 @@ def solve_laplace(
         is_dirichlet[i, j] = True
 
     # ---- 初期条件の設定 ----
-    # is_dirichlet なセルは boundary_value、dirichlet_conditions は指定値に設定
+    # 外壁/障害物/dirichlet_conditions をそれぞれ指定値で設定
     phi[is_dirichlet] = boundary_value
+    phi[0, :] = boundary_value
+    phi[-1, :] = boundary_value
+    phi[:, 0] = boundary_value
+    phi[:, -1] = boundary_value
     for (i, j), value in dirichlet_conditions:
         phi[i, j] = value
 
@@ -152,6 +156,29 @@ def _point_to_index(
     return ix, iy
 
 
+def _goal_disk_indices(
+    goal: Tuple[float, float],
+    radius: float,
+    xs: FloatArray,
+    ys: FloatArray,
+) -> list[Tuple[int, int]]:
+    nx, ny = xs.size, ys.size
+    gx, gy = goal
+    dx = float(xs[1] - xs[0])
+    dy = float(ys[1] - ys[0])
+    r_ix = int(np.ceil(radius / dx))
+    r_iy = int(np.ceil(radius / dy))
+
+    ig = _closest_index(xs, gx)
+    jg = _closest_index(ys, gy)
+    indices: list[Tuple[int, int]] = []
+    for i in range(max(0, ig - r_ix), min(nx, ig + r_ix + 1)):
+        for j in range(max(0, jg - r_iy), min(ny, jg + r_iy + 1)):
+            if (xs[i] - gx) ** 2 + (ys[j] - gy) ** 2 <= radius * radius:
+                indices.append((i, j))
+    return indices
+
+
 def main() -> int:
     layout_path = Path(__file__).resolve().parent / "layout_2d.yaml"
     omega = 1.5
@@ -162,10 +189,19 @@ def main() -> int:
     layout = load_layout2d_yaml(layout_path)
     if layout.world.goal is None:
         raise ValueError("goal must be set in layout_2d.yaml")
+    if layout.world.goal_radius is None:
+        raise ValueError("goal_radius must be set in layout_2d.yaml")
 
     occ, xs, ys = rasterize_occupancy_grid_2d(layout)
-    goal_idx = _point_to_index(layout.world.goal, xs, ys)
-    dirichlet_conditions = [(goal_idx, 0.0)]
+    goal_indices = _goal_disk_indices(
+        layout.world.goal,
+        layout.world.goal_radius,
+        xs,
+        ys,
+    )
+    dirichlet_conditions = [
+        ((i, j), 0.0) for (i, j) in goal_indices if not occ[i, j]
+    ]
 
     result = solve_laplace(
         occ,

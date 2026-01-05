@@ -65,23 +65,22 @@ def plot_laplace_2d(
 def plot_residual_history(
     residual: Iterable[float],
     residual_norm: Iterable[float],
-    *,
-    ax=None,
 ):
     import matplotlib.pyplot as plt
 
-    if ax is None:
-        _, ax = plt.subplots()
+    fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True)
+    ax0.plot(list(residual), color="tab:blue")
+    ax0.set_ylabel("residual")
+    ax0.set_yscale("log")
+    ax0.set_title("Residual history")
+    ax0.grid(True, alpha=0.3)
 
-    ax.plot(list(residual), label="residual")
-    ax.plot(list(residual_norm), label="residual (normalized)")
-    ax.set_xlabel("iteration")
-    ax.set_ylabel("residual")
-    ax.set_yscale("log")
-    ax.set_title("Residual history")
-    ax.grid(True, alpha=0.3)
-    ax.legend()
-    return ax
+    ax1.plot(list(residual_norm), color="tab:orange")
+    ax1.set_xlabel("iteration")
+    ax1.set_ylabel("residual (normalized)")
+    ax1.set_yscale("log")
+    ax1.grid(True, alpha=0.3)
+    return fig, (ax0, ax1)
 
 
 def plot_laplace_surface_3d(
