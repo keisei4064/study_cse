@@ -9,6 +9,11 @@ import numpy as np
 import numpy.typing as npt
 
 from occupancy_grid_2d import load_layout2d_yaml, rasterize_occupancy_grid_2d
+from plot_laplace_2d import (
+    plot_laplace_2d,
+    plot_laplace_surface_3d,
+    plot_residual_history,
+)
 
 
 BoolArray = npt.NDArray[np.bool_]
@@ -162,7 +167,7 @@ def main() -> int:
     goal_idx = _point_to_index(layout.world.goal, xs, ys)
     dirichlet_conditions = [(goal_idx, 0.0)]
 
-    _ = solve_laplace(
+    result = solve_laplace(
         occ,
         xs,
         ys,
@@ -172,6 +177,22 @@ def main() -> int:
         max_iter=max_iter,
         tol=tol,
     )
+    _ = plot_laplace_2d(
+        occ,
+        xs,
+        ys,
+        result.phi,
+        start=layout.world.start,
+        goal=layout.world.goal,
+    )
+    _ = plot_laplace_surface_3d(xs, ys, result.phi)
+    _ = plot_residual_history(
+        result.residual_history,
+        result.residual_norm_history,
+    )
+    import matplotlib.pyplot as plt
+
+    plt.show()
     return 0
 
 
