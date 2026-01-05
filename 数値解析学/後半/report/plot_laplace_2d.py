@@ -30,6 +30,7 @@ def plot_laplace_2d(
     start: Tuple[float, float] | None = None,
     goal: Tuple[float, float] | None = None,
     path: Iterable[Tuple[int, int]] | None = None,
+    path_xy: Iterable[Tuple[float, float]] | None = None,
     ax=None,
 ):
     import matplotlib.pyplot as plt
@@ -50,6 +51,12 @@ def plot_laplace_2d(
     if path is not None:
         path_x, path_y = _path_to_xy(path, xs, ys)
         ax.plot(path_x, path_y, color="tab:orange", linewidth=2.0)
+    if path_xy is not None:
+        points = list(path_xy)
+        if points:
+            px = [p[0] for p in points]
+            py = [p[1] for p in points]
+            ax.plot(px, py, color="tab:orange", linewidth=2.0)
     if start is not None:
         ax.plot(start[0], start[1], marker="o", markersize=7, color="tab:blue")
     if goal is not None:
@@ -63,6 +70,7 @@ def plot_laplace_2d(
 
 
 def plot_velocity_quiver_2d(
+    occ: BoolArray,
     xs: FloatArray,
     ys: FloatArray,
     u: FloatArray,
@@ -77,6 +85,7 @@ def plot_velocity_quiver_2d(
         _, ax = plt.subplots()
 
     stride = step if step is not None else max(1, min(xs.size, ys.size) // 20)
+    mask_occ = occ[::stride, ::stride]
     uu = u[::stride, ::stride]
     vv = v[::stride, ::stride]
     speed = np.sqrt(uu**2 + vv**2)
@@ -85,12 +94,25 @@ def plot_velocity_quiver_2d(
     vv_unit = vv / speed_safe
 
     grid_scale = 0.5 * min(float(xs[1] - xs[0]), float(ys[1] - ys[0]))
+    extent = (xs[0], xs[-1], ys[0], ys[-1])
+    ax.imshow(
+        occ.T,
+        origin="lower",
+        extent=extent,
+        cmap="gray_r",
+        interpolation="nearest",
+        alpha=0.4,
+    )
+    X = xs[::stride]
+    Y = ys[::stride]
+    XX, YY = np.meshgrid(X, Y, indexing="ij")
+    valid = ~mask_occ
     q = ax.quiver(
-        xs[::stride],
-        ys[::stride],
-        (uu_unit * grid_scale).T,
-        (vv_unit * grid_scale).T,
-        speed.T,
+        XX[valid],
+        YY[valid],
+        (uu_unit * grid_scale)[valid],
+        (vv_unit * grid_scale)[valid],
+        speed[valid],
         angles="xy",
         scale_units="xy",
         scale=1.0,

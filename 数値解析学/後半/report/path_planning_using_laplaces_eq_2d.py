@@ -202,6 +202,47 @@ def _goal_disk_indices(
     return indices
 
 
+def trace_path_from_start(
+    start: Tuple[float, float],
+    goal: Tuple[float, float],
+    goal_radius: float,
+    xs: FloatArray,
+    ys: FloatArray,
+    u: FloatArray,
+    v: FloatArray,
+    *,
+    max_steps: int = 5000,
+    step_scale: float = 0.5,
+) -> list[Tuple[float, float]]:
+    dx = float(xs[1] - xs[0])
+    dy = float(ys[1] - ys[0])
+    step = step_scale * min(dx, dy)
+    x0, x1 = float(xs[0]), float(xs[-1])
+    y0, y1 = float(ys[0]), float(ys[-1])
+
+    path: list[Tuple[float, float]] = [start]
+    x, y = start
+    # TODO(report): 経路生成が連続座標ステップなので、レポートで妥当性/比較を要検討。
+    for _ in range(max_steps):
+        if (x - goal[0]) ** 2 + (y - goal[1]) ** 2 <= goal_radius * goal_radius:
+            break
+        if not (x0 <= x <= x1 and y0 <= y <= y1):
+            break
+
+        i = _closest_index(xs, x)
+        j = _closest_index(ys, y)
+        ux = float(u[i, j])
+        vy = float(v[i, j])
+        norm = (ux * ux + vy * vy) ** 0.5
+        if norm == 0.0:
+            break
+        x += step * ux / norm
+        y += step * vy / norm
+        path.append((x, y))
+
+    return path
+
+
 def main() -> int:
     layout_path = Path(__file__).resolve().parent / "layout_2d.yaml"
     omega = 1.5
@@ -214,6 +255,8 @@ def main() -> int:
         raise ValueError("goal must be set in layout_2d.yaml")
     if layout.world.goal_radius is None:
         raise ValueError("goal_radius must be set in layout_2d.yaml")
+    if layout.world.start is None:
+        raise ValueError("start must be set in layout_2d.yaml")
 
     occ, xs, ys = rasterize_occupancy_grid_2d(layout)
     goal_indices = _goal_disk_indices(
@@ -236,6 +279,15 @@ def main() -> int:
         max_iter=max_iter,
         tol=tol,
     )
+    path_xy = trace_path_from_start(
+        layout.world.start,
+        layout.world.goal,
+        layout.world.goal_radius,
+        xs,
+        ys,
+        result.u,
+        result.v,
+    )
     _ = plot_laplace_2d(
         occ,
         xs,
@@ -243,8 +295,9 @@ def main() -> int:
         result.phi,
         start=layout.world.start,
         goal=layout.world.goal,
+        path_xy=path_xy,
     )
-    _ = plot_velocity_quiver_2d(xs, ys, result.u, result.v)
+    _ = plot_velocity_quiver_2d(occ, xs, ys, result.u, result.v)
     _ = plot_laplace_surface_3d(xs, ys, result.phi)
     _ = plot_residual_history(
         result.residual_history,
