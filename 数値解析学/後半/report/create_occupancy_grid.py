@@ -18,6 +18,8 @@ class World2D:
     ylim: Tuple[float, float]
     nx: int
     ny: int
+    start: Tuple[float, float] | None = None
+    goal: Tuple[float, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -35,7 +37,27 @@ class Layout2D:
     obstacles: List[Box2D]
 
 
-def _to_world2d(world: Dict[str, Any]) -> World2D:
+def _parse_point(
+    point_raw: Any,
+    *,
+    xlim: Tuple[float, float],
+    ylim: Tuple[float, float],
+    name: str,
+) -> Tuple[float, float]:
+    if not (isinstance(point_raw, list) and len(point_raw) == 2):
+        raise ValueError(f"{name} must be a list of length 2, e.g. [0.0, 1.0]")
+    px, py = float(point_raw[0]), float(point_raw[1])
+    if not (xlim[0] <= px <= xlim[1] and ylim[0] <= py <= ylim[1]):
+        raise ValueError(f"{name} must be inside world.xlim/world.ylim")
+    return px, py
+
+
+def _to_world2d(
+    world: Dict[str, Any],
+    *,
+    start_raw: Any | None = None,
+    goal_raw: Any | None = None,
+) -> World2D:
     xlim_raw = world["xlim"]
     ylim_raw = world["ylim"]
     nx = int(world["nx"])
@@ -53,7 +75,25 @@ def _to_world2d(world: Dict[str, Any]) -> World2D:
     if not (x0 < x1 and y0 < y1):
         raise ValueError("world.xlim/world.ylim must satisfy min < max")
 
-    return World2D(xlim=(x0, x1), ylim=(y0, y1), nx=nx, ny=ny)
+    if start_raw is None:
+        start_raw = world.get("start")
+    if goal_raw is None:
+        goal_raw = world.get("goal")
+    start = None
+    if start_raw is not None:
+        start = _parse_point(start_raw, xlim=(x0, x1), ylim=(y0, y1), name="start")
+    goal = None
+    if goal_raw is not None:
+        goal = _parse_point(goal_raw, xlim=(x0, x1), ylim=(y0, y1), name="goal")
+
+    return World2D(
+        xlim=(x0, x1),
+        ylim=(y0, y1),
+        nx=nx,
+        ny=ny,
+        start=start,
+        goal=goal,
+    )
 
 
 def _to_box2d(d: Dict[str, Any]) -> Box2D:
@@ -80,7 +120,11 @@ def load_layout2d_yaml(path: str | Path) -> Layout2D:
     if not isinstance(data, dict):
         raise ValueError("layout.yaml root must be a mapping/dict.")
 
-    world = _to_world2d(data["world"])
+    world = _to_world2d(
+        data["world"],
+        start_raw=data.get("start"),
+        goal_raw=data.get("goal"),
+    )
     obstacles_raw = data.get("obstacles", [])
     if not isinstance(obstacles_raw, list):
         raise ValueError("obstacles must be a list.")
@@ -120,6 +164,8 @@ def plot_occupancy_grid(
     xs: FloatArray,
     ys: FloatArray,
     *,
+    start: Tuple[float, float] | None = None,
+    goal: Tuple[float, float] | None = None,
     ax=None,
 ):
     import matplotlib.pyplot as plt
@@ -154,6 +200,10 @@ def plot_occupancy_grid(
     ax.set_ylabel("y")
     ax.set_title("Occupancy grid")
     ax.set_aspect("equal")
+    if start is not None:
+        ax.plot(start[0], start[1], marker="o", markersize=7, color="tab:blue")
+    if goal is not None:
+        ax.plot(goal[0], goal[1], marker="*", markersize=12, color="tab:red")
     return ax
 
 
@@ -183,7 +233,13 @@ def main() -> int:
     layout = load_layout2d_yaml(layout_path)
     occ, xs, ys = rasterize_occupancy_grid_2d(layout)
 
-    _ = plot_occupancy_grid(occ, xs, ys)
+    _ = plot_occupancy_grid(
+        occ,
+        xs,
+        ys,
+        start=layout.world.start,
+        goal=layout.world.goal,
+    )
     if not args.no_show:
         import matplotlib.pyplot as plt
 

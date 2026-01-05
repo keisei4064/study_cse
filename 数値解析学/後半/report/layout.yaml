@@ -5,6 +5,9 @@ world:
   nx: 11
   ny: 11
 
+start: [0.10, 0.50]
+goal: [0.90, 0.50]
+
 obstacles:
   - name: box1
     type: box
