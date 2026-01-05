@@ -40,7 +40,12 @@ def plot_laplace_2d(
     else:
         ax_lin, ax_log = ax
 
-    extent = (xs[0], xs[-1], ys[0], ys[-1])
+    if xs.size > 1 and ys.size > 1:
+        dx = float(xs[1] - xs[0])
+        dy = float(ys[1] - ys[0])
+        extent = (xs[0] - dx / 2, xs[-1] + dx / 2, ys[0] - dy / 2, ys[-1] + dy / 2)
+    else:
+        extent = (xs[0], xs[-1], ys[0], ys[-1])
     ax_lin.imshow(
         occ.T,
         origin="lower",
@@ -126,7 +131,12 @@ def plot_velocity_quiver_2d(
         _, ax = plt.subplots()
 
     stride = step if step is not None else max(1, min(xs.size, ys.size) // 20)
-    mask_occ = occ[::stride, ::stride]
+    boundary_mask = np.zeros_like(occ, dtype=bool)
+    boundary_mask[0, :] = True
+    boundary_mask[-1, :] = True
+    boundary_mask[:, 0] = True
+    boundary_mask[:, -1] = True
+    mask_occ = (occ | boundary_mask)[::stride, ::stride]
     uu = u[::stride, ::stride]
     vv = v[::stride, ::stride]
     speed = np.sqrt(uu**2 + vv**2)
@@ -167,6 +177,87 @@ def plot_velocity_quiver_2d(
     return ax
 
 
+def plot_velocity_quiver_2d_log(
+    occ: BoolArray,
+    xs: FloatArray,
+    ys: FloatArray,
+    u: FloatArray,
+    v: FloatArray,
+    *,
+    step: int | None = None,
+    ax=None,
+):
+    import matplotlib.pyplot as plt
+
+    if ax is None:
+        _, ax = plt.subplots()
+
+    stride = step if step is not None else max(1, min(xs.size, ys.size) // 20)
+    boundary_mask = np.zeros_like(occ, dtype=bool)
+    boundary_mask[0, :] = True
+    boundary_mask[-1, :] = True
+    boundary_mask[:, 0] = True
+    boundary_mask[:, -1] = True
+    mask_occ = (occ | boundary_mask)[::stride, ::stride]
+    uu = u[::stride, ::stride]
+    vv = v[::stride, ::stride]
+    speed = np.sqrt(uu**2 + vv**2)
+    speed_safe = np.where(speed == 0.0, 1.0, speed)
+    uu_unit = uu / speed_safe
+    vv_unit = vv / speed_safe
+
+    grid_scale = 0.5 * min(float(xs[1] - xs[0]), float(ys[1] - ys[0]))
+    extent = (xs[0], xs[-1], ys[0], ys[-1])
+    ax.imshow(
+        occ.T,
+        origin="lower",
+        extent=extent,
+        cmap="gray_r",
+        interpolation="nearest",
+    )
+
+    X = xs[::stride]
+    Y = ys[::stride]
+    XX, YY = np.meshgrid(X, Y, indexing="ij")
+    valid = ~mask_occ
+    log_speed = -np.log10(np.clip(speed, 1.0e-12, None))
+    q = ax.quiver(
+        XX[valid],
+        YY[valid],
+        (uu_unit * grid_scale)[valid],
+        (vv_unit * grid_scale)[valid],
+        log_speed[valid],
+        angles="xy",
+        scale_units="xy",
+        scale=1.0,
+        width=0.0025,
+        cmap="viridis",
+    )
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_title("Velocity field (quiver, -log10|v|)")
+    ax.set_aspect("equal")
+    plt.colorbar(q, ax=ax, label="-log10(|v|)")
+    return ax
+
+
+def plot_velocity_quiver_2d_pair(
+    occ: BoolArray,
+    xs: FloatArray,
+    ys: FloatArray,
+    u: FloatArray,
+    v: FloatArray,
+    *,
+    step: int | None = None,
+):
+    import matplotlib.pyplot as plt
+
+    fig, (ax_lin, ax_log) = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
+    plot_velocity_quiver_2d(occ, xs, ys, u, v, step=step, ax=ax_lin)
+    plot_velocity_quiver_2d_log(occ, xs, ys, u, v, step=step, ax=ax_log)
+    return ax_lin, ax_log
+
+
 def plot_residual_history(
     residual: Iterable[float],
     residual_norm: Iterable[float],
@@ -193,6 +284,7 @@ def plot_laplace_surface_3d(
     ys: FloatArray,
     phi: FloatArray,
     *,
+    occ: BoolArray | None = None,
     ax=None,
 ):
     import matplotlib.pyplot as plt
@@ -204,7 +296,15 @@ def plot_laplace_surface_3d(
         fig = ax.figure
 
     X, Y = np.meshgrid(xs, ys, indexing="ij")
-    surf = ax.plot_surface(X, Y, phi, cmap="viridis", linewidth=0.0, antialiased=True)
+    phi_plot = phi
+    if occ is not None:
+        boundary_mask = np.zeros_like(occ, dtype=bool)
+        boundary_mask[0, :] = True
+        boundary_mask[-1, :] = True
+        boundary_mask[:, 0] = True
+        boundary_mask[:, -1] = True
+        phi_plot = np.ma.masked_array(phi, mask=(occ | boundary_mask))
+    surf = ax.plot_surface(X, Y, phi_plot, cmap="viridis", linewidth=0.0, antialiased=True)
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.set_zlabel("phi", labelpad=8)
@@ -260,7 +360,7 @@ def plot_laplace_surface_3d_pair(
     fig = plt.figure(figsize=(10, 4))
     ax_lin = fig.add_subplot(1, 2, 1, projection="3d")
     ax_log = fig.add_subplot(1, 2, 2, projection="3d")
-    plot_laplace_surface_3d(xs, ys, phi, ax=ax_lin)
+    plot_laplace_surface_3d(xs, ys, phi, occ=occ, ax=ax_lin)
     plot_laplace_surface_3d_log(xs, ys, phi, occ=occ, ax=ax_log)
     fig.tight_layout()
     return ax_lin, ax_log

@@ -12,7 +12,7 @@ from occupancy_grid_2d import load_layout2d_yaml, rasterize_occupancy_grid_2d
 from plot_laplace_2d import (
     plot_laplace_2d,
     plot_laplace_surface_3d_pair,
-    plot_velocity_quiver_2d,
+    plot_velocity_quiver_2d_pair,
     plot_residual_history,
 )
 
@@ -297,7 +297,7 @@ def main() -> int:
         goal=layout.world.goal,
         path_xy=path_xy,
     )
-    _ = plot_velocity_quiver_2d(occ, xs, ys, result.u, result.v)
+    _ = plot_velocity_quiver_2d_pair(occ, xs, ys, result.u, result.v)
     _ = plot_laplace_surface_3d_pair(xs, ys, result.phi, occ=occ)
     _ = plot_residual_history(
         result.residual_history,
