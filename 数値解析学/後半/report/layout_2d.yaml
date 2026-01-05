@@ -1,4 +1,4 @@
-# layout.yaml
+# layout_2d.yaml
 world:
   xlim: [0.0, 1.0]
   ylim: [0.0, 1.0]

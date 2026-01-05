@@ -118,7 +118,7 @@ def load_layout2d_yaml(path: str | Path) -> Layout2D:
     p = Path(path)
     data = yaml.safe_load(p.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
-        raise ValueError("layout.yaml root must be a mapping/dict.")
+        raise ValueError("layout_2d.yaml root must be a mapping/dict.")
 
     world = _to_world2d(
         data["world"],
@@ -214,7 +214,7 @@ def _parse_args():
     parser.add_argument(
         "--layout",
         default="",
-        help="Path to layout YAML. Defaults to layout.yaml in this script directory.",
+        help="Path to layout YAML. Defaults to layout_2d.yaml in this script directory.",
     )
     parser.add_argument(
         "--no-show",
@@ -229,7 +229,7 @@ def main() -> int:
     if args.layout:
         layout_path = Path(args.layout)
     else:
-        layout_path = Path(__file__).resolve().parent / "layout.yaml"
+        layout_path = Path(__file__).resolve().parent / "layout_2d.yaml"
     layout = load_layout2d_yaml(layout_path)
     occ, xs, ys = rasterize_occupancy_grid_2d(layout)
 
