@@ -336,6 +336,11 @@ def rasterize_occupancy_grid_2d(
         box = _wall_to_box(obs) if isinstance(obs, Wall2D) else obs
         mask = (box.xmin <= xx) & (xx <= box.xmax) & (box.ymin <= yy) & (yy <= box.ymax)
         occ |= mask
+    # Treat outer frame as occupied wall.
+    occ[0, :] = True
+    occ[-1, :] = True
+    occ[:, 0] = True
+    occ[:, -1] = True
 
     return occ, xs, ys
 

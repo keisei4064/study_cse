@@ -1,50 +1,54 @@
-# layout_2d.yaml
 world:
-  xlim: [0.0, 1.0]
-  ylim: [0.0, 1.0]
+  xlim:
+  - 0.0
+  - 1.0
+  ylim:
+  - 0.0
+  - 1.0
   nx: 22
   ny: 22
-
-start: [0.10, 0.50]
-goal: [0.90, 0.50]
-goal_radius: 0.05
-
-wall_thickness: 0.05
-
+start:
+- 0.7
+- 0.748
+goal:
+- 0.5
+- 0.55
 obstacles:
-  # L字型の凹壁（2つの wall で構成）
-  - name: wall_vertical
-    type: wall
-    x0: 0.425
-    y0: 0.15
-    x1: 0.425
-    y1: 0.85
-
-  - name: wall_horizontal
-    type: wall
-    x0: 0.40
-    y0: 0.175
-    x1: 0.80
-    y1: 0.175
-
-  # 追加の壁（合計5個）
-  - name: wall_top
-    type: wall
-    x0: 0.45
-    y0: 0.825
-    x1: 0.80
-    y1: 0.825
-
-  - name: wall_right
-    type: wall
-    x0: 0.825
-    y0: 0.20
-    x1: 0.825
-    y1: 0.85
-
-  - name: box1
-    type: box
-    xmin: 0.18
-    xmax: 0.30
-    ymin: 0.45
-    ymax: 0.60
+- name: wall1
+  type: wall
+  x0: 0.4
+  y0: 0.15
+  x1: 0.4
+  y1: 0.45
+- name: wall2
+  type: wall
+  x0: 0.6
+  y0: 0.45
+  x1: 0.4
+  y1: 0.45
+- name: wall3
+  type: wall
+  x0: 0.85
+  y0: 0.65
+  x1: 0.15
+  y1: 0.65
+- name: wall4
+  type: wall
+  x0: 0.6
+  y0: 0.45
+  x1: 0.6
+  y1: 0.65
+- name: wall5
+  type: wall
+  x0: 0.6
+  y0: 0.65
+  x1: 0.6
+  y1: 0.85
+- name: box1
+  type: box
+  xmin: 0.55
+  xmax: 0.85
+  ymin: 0.15
+  ymax: 0.3
+goal_radius: 0.05
+wall_thickness: 0.05
