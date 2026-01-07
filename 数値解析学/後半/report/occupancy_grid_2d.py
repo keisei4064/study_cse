@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, TypedDict, Literal, NotRequired
 import numpy as np
 import numpy.typing as npt
 import yaml
@@ -10,6 +10,45 @@ import yaml
 
 BoolArray = npt.NDArray[np.bool_]
 FloatArray = npt.NDArray[np.float64]
+
+class BoxSpec(TypedDict):
+    type: Literal["box"]
+    xmin: float
+    xmax: float
+    ymin: float
+    ymax: float
+    name: NotRequired[str]
+
+
+class WallSpec(TypedDict):
+    type: Literal["wall"]
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    name: NotRequired[str]
+
+
+ObstacleSpec = BoxSpec | WallSpec
+
+
+class WorldSpec(TypedDict):
+    xlim: list[float]
+    ylim: list[float]
+    nx: int
+    ny: int
+    start: NotRequired[list[float]]
+    goal: NotRequired[list[float]]
+    goal_radius: NotRequired[float]
+
+
+class LayoutSpec(TypedDict):
+    world: WorldSpec
+    obstacles: NotRequired[list[ObstacleSpec]]
+    start: NotRequired[list[float]]
+    goal: NotRequired[list[float]]
+    goal_radius: NotRequired[float]
+    wall_thickness: NotRequired[float]
 
 
 @dataclass(frozen=True)
@@ -33,9 +72,22 @@ class Box2D:
 
 
 @dataclass(frozen=True)
+class Wall2D:
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    thickness: float
+    name: str = "wall"
+
+
+Obstacle2D = Box2D | Wall2D
+
+
+@dataclass(frozen=True)
 class Layout2D:
     world: World2D
-    obstacles: List[Box2D]
+    obstacles: List[Obstacle2D]
     wall_thickness: float | None = None
 
 
@@ -55,7 +107,7 @@ def _parse_point(
 
 
 def _to_world2d(
-    world: Dict[str, Any],
+    world: WorldSpec,
     *,
     start_raw: Any | None = None,
     goal_raw: Any | None = None,
@@ -107,29 +159,24 @@ def _to_world2d(
     )
 
 
-def _to_box2d(d: Dict[str, Any]) -> Box2D:
-    if d.get("type", "box") != "box":
-        raise ValueError(f"Unsupported obstacle type: {d.get('type')}.")
-
+def _to_box2d(d: BoxSpec) -> Box2D:
     name = str(d.get("name", "box"))
     xmin = float(d["xmin"])
     xmax = float(d["xmax"])
     ymin = float(d["ymin"])
     ymax = float(d["ymax"])
 
-    if not (xmin < xmax and ymin < ymax):
-        raise ValueError(f"Invalid box '{name}': require xmin<xmax and ymin<ymax.")
-
+    _validate_box_bounds(xmin, xmax, ymin, ymax, name=name)
     return Box2D(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, name=name)
 
 
-def _to_wall_box2d(
-    d: Dict[str, Any],
+def _to_wall2d(
+    d: WallSpec,
     *,
     thickness: float,
     xlim: Tuple[float, float],
     ylim: Tuple[float, float],
-) -> Box2D:
+) -> Wall2D:
     name = str(d.get("name", "wall"))
     x0 = float(d["x0"])
     y0 = float(d["y0"])
@@ -138,24 +185,64 @@ def _to_wall_box2d(
 
     if thickness <= 0.0:
         raise ValueError("wall_thickness must be > 0")
-
-    if x0 == x1:
-        xmin = x0 - thickness / 2.0
-        xmax = x0 + thickness / 2.0
-        ymin = min(y0, y1)
-        ymax = max(y0, y1)
-    elif y0 == y1:
-        xmin = min(x0, x1)
-        xmax = max(x0, x1)
-        ymin = y0 - thickness / 2.0
-        ymax = y0 + thickness / 2.0
-    else:
+    if x0 != x1 and y0 != y1:
         raise ValueError(f"Wall '{name}' must be axis-aligned (x0==x1 or y0==y1).")
 
-    if not (xlim[0] <= xmin and xmax <= xlim[1] and ylim[0] <= ymin and ymax <= ylim[1]):
-        raise ValueError(f"Wall '{name}' must be inside world.xlim/world.ylim")
+    _validate_point_in_world(x0, y0, xlim=xlim, ylim=ylim, name=f"wall '{name}'")
+    _validate_point_in_world(x1, y1, xlim=xlim, ylim=ylim, name=f"wall '{name}'")
+    return Wall2D(x0=x0, y0=y0, x1=x1, y1=y1, thickness=thickness, name=name)
 
-    return Box2D(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, name=name)
+
+def _validate_point_in_world(
+    x: float,
+    y: float,
+    *,
+    xlim: Tuple[float, float],
+    ylim: Tuple[float, float],
+    name: str,
+) -> None:
+    if not (xlim[0] <= x <= xlim[1] and ylim[0] <= y <= ylim[1]):
+        raise ValueError(f"{name} must be inside world.xlim/world.ylim")
+
+
+def _validate_box_bounds(
+    xmin: float,
+    xmax: float,
+    ymin: float,
+    ymax: float,
+    *,
+    name: str,
+) -> None:
+    if not (xmin < xmax and ymin < ymax):
+        raise ValueError(f"Invalid box '{name}': require xmin<xmax and ymin<ymax.")
+
+
+def _validate_box_inside_world(
+    xmin: float,
+    xmax: float,
+    ymin: float,
+    ymax: float,
+    *,
+    xlim: Tuple[float, float],
+    ylim: Tuple[float, float],
+    name: str,
+) -> None:
+    if not (xlim[0] <= xmin and xmax <= xlim[1] and ylim[0] <= ymin and ymax <= ylim[1]):
+        raise ValueError(f"Obstacle '{name}' must be inside world.xlim/world.ylim")
+
+
+def _wall_to_box(wall: Wall2D) -> Box2D:
+    if wall.x0 == wall.x1:
+        xmin = wall.x0 - wall.thickness / 2.0
+        xmax = wall.x0 + wall.thickness / 2.0
+        ymin = min(wall.y0, wall.y1)
+        ymax = max(wall.y0, wall.y1)
+    else:
+        xmin = min(wall.x0, wall.x1)
+        xmax = max(wall.x0, wall.x1)
+        ymin = wall.y0 - wall.thickness / 2.0
+        ymax = wall.y0 + wall.thickness / 2.0
+    return Box2D(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, name=wall.name)
 
 
 def load_layout2d_yaml(path: str | Path) -> Layout2D:
@@ -163,40 +250,64 @@ def load_layout2d_yaml(path: str | Path) -> Layout2D:
     data = yaml.safe_load(p.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError("layout_2d.yaml root must be a mapping/dict.")
+    layout = data  # type: ignore[assignment]
 
     world = _to_world2d(
-        data["world"],
-        start_raw=data.get("start"),
-        goal_raw=data.get("goal"),
-        goal_radius_raw=data.get("goal_radius"),
+        layout["world"],
+        start_raw=layout.get("start"),
+        goal_raw=layout.get("goal"),
+        goal_radius_raw=layout.get("goal_radius"),
     )
-    obstacles_raw = data.get("obstacles", [])
+    obstacles_raw = layout.get("obstacles", [])
     if not isinstance(obstacles_raw, list):
         raise ValueError("obstacles must be a list.")
 
-    wall_thickness_raw = data.get("wall_thickness")
+    for idx, item in enumerate(obstacles_raw):
+        if not isinstance(item, dict):
+            raise ValueError(f"obstacles[{idx}] must be a mapping/dict.")
+
+    wall_thickness_raw = layout.get("wall_thickness")
     wall_thickness = None
     if wall_thickness_raw is not None:
         wall_thickness = float(wall_thickness_raw)
         if wall_thickness <= 0.0:
             raise ValueError("wall_thickness must be > 0")
 
-    obstacles: list[Box2D] = []
+    obstacles: list[Obstacle2D] = []
     for o in obstacles_raw:
         otype = o.get("type", "box")
         if otype == "box":
-            obstacles.append(_to_box2d(o))
+            box = _to_box2d(o)  # type: ignore[arg-type]
+            _validate_box_inside_world(
+                box.xmin,
+                box.xmax,
+                box.ymin,
+                box.ymax,
+                xlim=world.xlim,
+                ylim=world.ylim,
+                name=box.name,
+            )
+            obstacles.append(box)
         elif otype == "wall":
             if wall_thickness is None:
                 raise ValueError("wall_thickness is required when using wall obstacles.")
-            obstacles.append(
-                _to_wall_box2d(
-                    o,
-                    thickness=wall_thickness,
-                    xlim=world.xlim,
-                    ylim=world.ylim,
-                )
+            wall = _to_wall2d(
+                o,  # type: ignore[arg-type]
+                thickness=wall_thickness,
+                xlim=world.xlim,
+                ylim=world.ylim,
             )
+            wall_box = _wall_to_box(wall)
+            _validate_box_inside_world(
+                wall_box.xmin,
+                wall_box.xmax,
+                wall_box.ymin,
+                wall_box.ymax,
+                xlim=world.xlim,
+                ylim=world.ylim,
+                name=wall.name,
+            )
+            obstacles.append(wall)
         else:
             raise ValueError(f"Unsupported obstacle type: {otype}.")
     return Layout2D(world=world, obstacles=obstacles, wall_thickness=wall_thickness)
@@ -221,8 +332,9 @@ def rasterize_occupancy_grid_2d(
     xx, yy = np.meshgrid(xs, ys, indexing="ij")  # (nx, ny)
 
     occ = np.zeros((w.nx, w.ny), dtype=np.bool_)
-    for b in layout.obstacles:
-        mask = (b.xmin <= xx) & (xx <= b.xmax) & (b.ymin <= yy) & (yy <= b.ymax)
+    for obs in layout.obstacles:
+        box = _wall_to_box(obs) if isinstance(obs, Wall2D) else obs
+        mask = (box.xmin <= xx) & (xx <= box.xmax) & (box.ymin <= yy) & (yy <= box.ymax)
         occ |= mask
 
     return occ, xs, ys
