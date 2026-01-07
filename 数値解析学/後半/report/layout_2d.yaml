@@ -9,17 +9,42 @@ start: [0.10, 0.50]
 goal: [0.90, 0.50]
 goal_radius: 0.05
 
+wall_thickness: 0.05
+
 obstacles:
+  # L字型の凹壁（2つの wall で構成）
+  - name: wall_vertical
+    type: wall
+    x0: 0.425
+    y0: 0.15
+    x1: 0.425
+    y1: 0.85
+
+  - name: wall_horizontal
+    type: wall
+    x0: 0.40
+    y0: 0.175
+    x1: 0.80
+    y1: 0.175
+
+  # 追加の壁（合計5個）
+  - name: wall_top
+    type: wall
+    x0: 0.45
+    y0: 0.825
+    x1: 0.80
+    y1: 0.825
+
+  - name: wall_right
+    type: wall
+    x0: 0.825
+    y0: 0.20
+    x1: 0.825
+    y1: 0.85
+
   - name: box1
     type: box
-    xmin: 0.25
+    xmin: 0.18
     xmax: 0.30
-    ymin: 0.00
-    ymax: 0.70
-
-  - name: box2
-    type: box
-    xmin: 0.70
-    xmax: 0.75
-    ymin: 0.30
-    ymax: 1.00
+    ymin: 0.45
+    ymax: 0.60
