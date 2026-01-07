@@ -137,8 +137,9 @@ def plot_velocity_quiver_2d(
     boundary_mask[:, 0] = True
     boundary_mask[:, -1] = True
     mask_occ = (occ | boundary_mask)[::stride, ::stride]
-    uu = u[::stride, ::stride]
-    vv = v[::stride, ::stride]
+    # 勾配降下方向を指す
+    uu = -u[::stride, ::stride]
+    vv = -v[::stride, ::stride]
     speed = np.sqrt(uu**2 + vv**2)
     speed_safe = np.where(speed == 0.0, 1.0, speed)
     uu_unit = uu / speed_safe
@@ -199,8 +200,9 @@ def plot_velocity_quiver_2d_log(
     boundary_mask[:, 0] = True
     boundary_mask[:, -1] = True
     mask_occ = (occ | boundary_mask)[::stride, ::stride]
-    uu = u[::stride, ::stride]
-    vv = v[::stride, ::stride]
+    # 勾配降下方向を指す
+    uu = -u[::stride, ::stride]
+    vv = -v[::stride, ::stride]
     speed = np.sqrt(uu**2 + vv**2)
     speed_safe = np.where(speed == 0.0, 1.0, speed)
     uu_unit = uu / speed_safe

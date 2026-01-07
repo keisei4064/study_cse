@@ -130,8 +130,12 @@ def _to_world2d(
 ) -> World2D:
     xlim_raw = world["xlim"]
     ylim_raw = world["ylim"]
-    nx = int(world["nx"])
-    ny = int(world["ny"])
+    nx_raw = world.get("nx")
+    ny_raw = world.get("ny")
+    if nx_raw is None or ny_raw is None:
+        raise ValueError("world.nx and world.ny must be set before parsing world.")
+    nx = int(nx_raw)
+    ny = int(ny_raw)
 
     if not (isinstance(xlim_raw, list) and len(xlim_raw) == 2):
         raise ValueError("world.xlim must be a list of length 2, e.g. [0.0, 1.0]")
