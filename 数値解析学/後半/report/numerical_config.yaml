@@ -1,0 +1,4 @@
+nx: 22
+ny: 22
+goal_radius: 0.05
+wall_thickness: 0.05

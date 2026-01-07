@@ -5,8 +5,6 @@ world:
   ylim:
   - 0.0
   - 1.0
-  nx: 22
-  ny: 22
 start:
 - 0.7
 - 0.748
@@ -50,5 +48,3 @@ obstacles:
   xmax: 0.85
   ymin: 0.15
   ymax: 0.3
-goal_radius: 0.05
-wall_thickness: 0.05

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, TypedDict, Literal, NotRequired
+from typing import Any, List, Tuple, TypedDict, Literal, NotRequired
 import numpy as np
 import numpy.typing as npt
 import yaml
@@ -35,8 +35,8 @@ ObstacleSpec = BoxSpec | WallSpec
 class WorldSpec(TypedDict):
     xlim: list[float]
     ylim: list[float]
-    nx: int
-    ny: int
+    nx: NotRequired[int]
+    ny: NotRequired[int]
     start: NotRequired[list[float]]
     goal: NotRequired[list[float]]
     goal_radius: NotRequired[float]
@@ -47,6 +47,13 @@ class LayoutSpec(TypedDict):
     obstacles: NotRequired[list[ObstacleSpec]]
     start: NotRequired[list[float]]
     goal: NotRequired[list[float]]
+    goal_radius: NotRequired[float]
+    wall_thickness: NotRequired[float]
+
+
+class NumericalConfigSpec(TypedDict):
+    nx: int
+    ny: int
     goal_radius: NotRequired[float]
     wall_thickness: NotRequired[float]
 
@@ -88,6 +95,14 @@ Obstacle2D = Box2D | Wall2D
 class Layout2D:
     world: World2D
     obstacles: List[Obstacle2D]
+    wall_thickness: float | None = None
+
+
+@dataclass(frozen=True)
+class NumericalConfig:
+    nx: int
+    ny: int
+    goal_radius: float | None = None
     wall_thickness: float | None = None
 
 
@@ -156,6 +171,40 @@ def _to_world2d(
         start=start,
         goal=goal,
         goal_radius=goal_radius,
+    )
+
+
+def load_numerical_config_yaml(path: str | Path) -> NumericalConfig:
+    p = Path(path)
+    data = yaml.safe_load(p.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("numerical_config.yaml root must be a mapping/dict.")
+    cfg: NumericalConfigSpec = data  # type: ignore[assignment]
+
+    if "nx" not in cfg or "ny" not in cfg:
+        raise ValueError("numerical_config.yaml must define nx and ny.")
+    nx = int(cfg["nx"])
+    ny = int(cfg["ny"])
+    if nx < 3 or ny < 3:
+        raise ValueError("nx and ny must be >= 3")
+
+    goal_radius = None
+    if "goal_radius" in cfg:
+        goal_radius = float(cfg["goal_radius"])
+        if goal_radius < 0.0:
+            raise ValueError("goal_radius must be >= 0")
+
+    wall_thickness = None
+    if "wall_thickness" in cfg:
+        wall_thickness = float(cfg["wall_thickness"])
+        if wall_thickness <= 0.0:
+            raise ValueError("wall_thickness must be > 0")
+
+    return NumericalConfig(
+        nx=nx,
+        ny=ny,
+        goal_radius=goal_radius,
+        wall_thickness=wall_thickness,
     )
 
 
@@ -245,18 +294,44 @@ def _wall_to_box(wall: Wall2D) -> Box2D:
     return Box2D(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, name=wall.name)
 
 
-def load_layout2d_yaml(path: str | Path) -> Layout2D:
+def load_layout2d_yaml(path: str | Path, *, config_path: str | Path | None = None) -> Layout2D:
     p = Path(path)
     data = yaml.safe_load(p.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError("layout_2d.yaml root must be a mapping/dict.")
-    layout = data  # type: ignore[assignment]
+    layout: LayoutSpec = data  # type: ignore[assignment]
 
+    cfg: NumericalConfig | None = None
+    if config_path is None:
+        config_path = p.with_name("numerical_config.yaml")
+    if config_path is not None:
+        cfg_path = Path(config_path)
+        if cfg_path.exists():
+            cfg = load_numerical_config_yaml(cfg_path)
+
+    world_raw = layout["world"]
+    nx = world_raw.get("nx")
+    ny = world_raw.get("ny")
+    if nx is None and cfg is not None:
+        nx = cfg.nx
+    if ny is None and cfg is not None:
+        ny = cfg.ny
+    if nx is None or ny is None:
+        raise ValueError("nx/ny must be set in numerical_config.yaml or layout_2d.yaml")
+
+    world_spec: WorldSpec = {
+        "xlim": world_raw["xlim"],
+        "ylim": world_raw["ylim"],
+        "nx": int(nx),
+        "ny": int(ny),
+    }
     world = _to_world2d(
-        layout["world"],
+        world_spec,
         start_raw=layout.get("start"),
         goal_raw=layout.get("goal"),
-        goal_radius_raw=layout.get("goal_radius"),
+        goal_radius_raw=(
+            cfg.goal_radius if cfg is not None and cfg.goal_radius is not None else layout.get("goal_radius")
+        ),
     )
     obstacles_raw = layout.get("obstacles", [])
     if not isinstance(obstacles_raw, list):
@@ -266,7 +341,9 @@ def load_layout2d_yaml(path: str | Path) -> Layout2D:
         if not isinstance(item, dict):
             raise ValueError(f"obstacles[{idx}] must be a mapping/dict.")
 
-    wall_thickness_raw = layout.get("wall_thickness")
+    wall_thickness_raw = (
+        cfg.wall_thickness if cfg is not None and cfg.wall_thickness is not None else layout.get("wall_thickness")
+    )
     wall_thickness = None
     if wall_thickness_raw is not None:
         wall_thickness = float(wall_thickness_raw)
@@ -403,6 +480,11 @@ def _parse_args():
         help="Path to layout YAML. Defaults to layout_2d.yaml in this script directory.",
     )
     parser.add_argument(
+        "--config",
+        default="",
+        help="Path to numerical_config.yaml. Defaults to same directory as layout.",
+    )
+    parser.add_argument(
         "--no-show",
         action="store_true",
         help="Do not open a GUI window.",
@@ -416,7 +498,8 @@ def main() -> int:
         layout_path = Path(args.layout)
     else:
         layout_path = Path(__file__).resolve().parent / "layout_2d.yaml"
-    layout = load_layout2d_yaml(layout_path)
+    config_path = Path(args.config) if args.config else None
+    layout = load_layout2d_yaml(layout_path, config_path=config_path)
     occ, xs, ys = rasterize_occupancy_grid_2d(layout)
 
     _ = plot_occupancy_grid(

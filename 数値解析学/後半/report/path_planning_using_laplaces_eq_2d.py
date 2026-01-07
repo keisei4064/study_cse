@@ -171,14 +171,6 @@ def _closest_index(values: FloatArray, target: float) -> int:
     return int(np.argmin(np.abs(values - target)))
 
 
-def _point_to_index(
-    point: Tuple[float, float], xs: FloatArray, ys: FloatArray
-) -> Tuple[int, int]:
-    ix = _closest_index(xs, point[0])
-    iy = _closest_index(ys, point[1])
-    return ix, iy
-
-
 def _goal_disk_indices(
     goal: Tuple[float, float],
     radius: float,

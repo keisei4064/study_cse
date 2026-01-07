@@ -313,18 +313,11 @@ def main() -> int:
         "world": {
             "xlim": [0.0, _round3(info.size.width)],
             "ylim": [0.0, _round3(info.size.height)],
-            "nx": int(args.nx),
-            "ny": int(args.ny),
         },
         "start": [_round3(start[0]), _round3(start[1])],
         "goal": [_round3(goal[0]), _round3(goal[1])],
         "obstacles": [],
     }
-    if args.goal_radius is not None:
-        layout["goal_radius"] = _round3(float(args.goal_radius))
-    if args.wall_thickness is not None:
-        layout["wall_thickness"] = _round3(float(args.wall_thickness))
-
     obstacles: list[dict[str, object]] = []
     for idx, wall in enumerate(walls, start=1):
         obstacles.append(
