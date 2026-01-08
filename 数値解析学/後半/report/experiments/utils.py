@@ -87,11 +87,12 @@ def plot_residual_histories(
 
     fig, ax = plt.subplots()
     for omega, result in zip(omegas, results, strict=True):
-        ax.plot(result.residual_norm_history, label=f"omega={omega:.2f}")
+        ax.plot(result.residual_norm_history, label=rf"$\omega$={omega:.2f}")
     ax.set_yscale("log")
     ax.set_xlabel("iteration")
     ax.set_ylabel("residual (normalized)")
     ax.set_title("SOR residual histories")
+    ax.set_xlim(left=0)
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize="small", ncol=2)
     fig.tight_layout()
@@ -109,9 +110,10 @@ def plot_iterations_vs_omega(
     iterations = [r.iterations for r in results]
     fig, ax = plt.subplots()
     ax.plot(list(omegas), iterations, marker="o")
-    ax.set_xlabel("omega")
-    ax.set_ylabel("iterations")
-    ax.set_title("SOR iterations vs omega")
+    ax.set_xlabel(r"$\omega$")
+    ax.set_ylabel("iterations to convergence")
+    ax.set_xlim(1.0, 2.0)
+    ax.set_title("Iterations to Convergence vs $\\omega$")
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(output_dir / "iterations_vs_omega.png", dpi=200)
