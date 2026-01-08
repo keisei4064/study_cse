@@ -5,6 +5,8 @@ import sys
 from typing import Iterable
 
 import numpy as np
+import time
+import csv
 
 from core.laplace_path_planning_solver import ProblemSpec
 from core.path_planning_utils import goal_disk_indices
@@ -117,3 +119,20 @@ def plot_iterations_vs_omega(
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(output_dir / "iterations_vs_omega.png", dpi=200)
+
+
+def measure_cpu_time(fn, *args, **kwargs):
+    """Measure CPU time for a function call."""
+    t0 = time.process_time()
+    result = fn(*args, **kwargs)
+    dt = time.process_time() - t0
+    return result, dt
+
+
+def write_timing_csv(output_dir: Path, rows: list[tuple[str, float]]) -> None:
+    output_path = output_dir / "timing.csv"
+    with output_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["metric", "seconds"])
+        for label, seconds in rows:
+            writer.writerow([label, f"{seconds:.6f}"])

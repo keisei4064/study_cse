@@ -14,7 +14,13 @@ from core.laplace_path_planning_solver import (
     solve_laplace,
     trace_path_from_start,
 )
-from experiments.utils import build_problem_with_grid, default_layout_path, make_output_dir
+from experiments.utils import (
+    build_problem_with_grid,
+    default_layout_path,
+    make_output_dir,
+    measure_cpu_time,
+    write_timing_csv,
+)
 from viz.plot_laplace import (
     plot_laplace,
     plot_laplace_surface_3d_pair,
@@ -45,18 +51,21 @@ def main() -> int:
     layout, problem, occ, xs, ys = build_problem_with_grid(layout_path)
     if layout.world.start is None:
         raise ValueError("start must be set in layout.yaml")
-    # ラプラス方程式を SOR で解く
-    result = solve_laplace(
+    # ラプラス方程式を SOR で解く（CPU time）
+    result, t_solver = measure_cpu_time(
+        solve_laplace,
         problem,
         method=method,
         omega=omega,
     )
-    # 速度場に沿った経路生成
-    path_result = trace_path_from_start(
+    # 速度場に沿った経路生成（CPU time）
+    path_result, t_path = measure_cpu_time(
+        trace_path_from_start,
         problem,
         result,
         start=layout.world.start,
     )
+    t_solver_path = t_solver + t_path
     path_xy = path_result.path_xy
     # 可視化（ポテンシャル/速度場/3D/残差履歴）
     ax_lin, ax_log = plot_laplace(
@@ -93,6 +102,19 @@ def main() -> int:
     fig_res.tight_layout()
     fig_res.savefig(output_dir / "residual_history.png", dpi=200)
     import matplotlib.pyplot as plt
+
+    # 計測結果の出力
+    print(f"CPU time (solver): {t_solver:.6f} s")
+    print(f"CPU time (path): {t_path:.6f} s")
+    print(f"CPU time (solver+path): {t_solver_path:.6f} s")
+    write_timing_csv(
+        output_dir,
+        [
+            ("solver", t_solver),
+            ("path", t_path),
+            ("solver+path", t_solver_path),
+        ],
+    )
 
     plt.show()
     return 0
