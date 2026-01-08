@@ -59,7 +59,7 @@ class NumericalConfigSpec(TypedDict):
 
 
 @dataclass(frozen=True)
-class World2D:
+class World:
     xlim: Tuple[float, float]
     ylim: Tuple[float, float]
     nx: int
@@ -70,7 +70,7 @@ class World2D:
 
 
 @dataclass(frozen=True)
-class Box2D:
+class Box:
     xmin: float
     xmax: float
     ymin: float
@@ -79,7 +79,7 @@ class Box2D:
 
 
 @dataclass(frozen=True)
-class Wall2D:
+class Wall:
     x0: float
     y0: float
     x1: float
@@ -88,13 +88,13 @@ class Wall2D:
     name: str = "wall"
 
 
-Obstacle2D = Box2D | Wall2D
+Obstacle = Box | Wall
 
 
 @dataclass(frozen=True)
-class Layout2D:
-    world: World2D
-    obstacles: List[Obstacle2D]
+class Layout:
+    world: World
+    obstacles: List[Obstacle]
     wall_thickness: float | None = None
 
 
@@ -121,13 +121,13 @@ def _parse_point(
     return px, py
 
 
-def _to_world2d(
+def _to_world(
     world: WorldSpec,
     *,
     start_raw: Any | None = None,
     goal_raw: Any | None = None,
     goal_radius_raw: Any | None = None,
-) -> World2D:
+) -> World:
     xlim_raw = world["xlim"]
     ylim_raw = world["ylim"]
     nx_raw = world.get("nx")
@@ -167,7 +167,7 @@ def _to_world2d(
         if goal_radius < 0.0:
             raise ValueError("goal_radius must be >= 0")
 
-    return World2D(
+    return World(
         xlim=(x0, x1),
         ylim=(y0, y1),
         nx=nx,
@@ -212,7 +212,7 @@ def load_numerical_config_yaml(path: str | Path) -> NumericalConfig:
     )
 
 
-def _to_box2d(d: BoxSpec) -> Box2D:
+def _to_box(d: BoxSpec) -> Box:
     name = str(d.get("name", "box"))
     xmin = float(d["xmin"])
     xmax = float(d["xmax"])
@@ -220,16 +220,16 @@ def _to_box2d(d: BoxSpec) -> Box2D:
     ymax = float(d["ymax"])
 
     _validate_box_bounds(xmin, xmax, ymin, ymax, name=name)
-    return Box2D(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, name=name)
+    return Box(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, name=name)
 
 
-def _to_wall2d(
+def _to_wall(
     d: WallSpec,
     *,
     thickness: float,
     xlim: Tuple[float, float],
     ylim: Tuple[float, float],
-) -> Wall2D:
+) -> Wall:
     name = str(d.get("name", "wall"))
     x0 = float(d["x0"])
     y0 = float(d["y0"])
@@ -243,7 +243,7 @@ def _to_wall2d(
 
     _validate_point_in_world(x0, y0, xlim=xlim, ylim=ylim, name=f"wall '{name}'")
     _validate_point_in_world(x1, y1, xlim=xlim, ylim=ylim, name=f"wall '{name}'")
-    return Wall2D(x0=x0, y0=y0, x1=x1, y1=y1, thickness=thickness, name=name)
+    return Wall(x0=x0, y0=y0, x1=x1, y1=y1, thickness=thickness, name=name)
 
 
 def _validate_point_in_world(
@@ -284,7 +284,7 @@ def _validate_box_inside_world(
         raise ValueError(f"Obstacle '{name}' must be inside world.xlim/world.ylim")
 
 
-def _wall_to_box(wall: Wall2D) -> Box2D:
+def _wall_to_box(wall: Wall) -> Box:
     if wall.x0 == wall.x1:
         xmin = wall.x0 - wall.thickness / 2.0
         xmax = wall.x0 + wall.thickness / 2.0
@@ -295,14 +295,14 @@ def _wall_to_box(wall: Wall2D) -> Box2D:
         xmax = max(wall.x0, wall.x1)
         ymin = wall.y0 - wall.thickness / 2.0
         ymax = wall.y0 + wall.thickness / 2.0
-    return Box2D(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, name=wall.name)
+    return Box(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, name=wall.name)
 
 
-def load_layout2d_yaml(path: str | Path, *, config_path: str | Path | None = None) -> Layout2D:
+def load_layout_yaml(path: str | Path, *, config_path: str | Path | None = None) -> Layout:
     p = Path(path)
     data = yaml.safe_load(p.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
-        raise ValueError("layout_2d.yaml root must be a mapping/dict.")
+        raise ValueError("layout.yaml root must be a mapping/dict.")
     layout: LayoutSpec = data  # type: ignore[assignment]
 
     cfg: NumericalConfig | None = None
@@ -321,7 +321,7 @@ def load_layout2d_yaml(path: str | Path, *, config_path: str | Path | None = Non
     if ny is None and cfg is not None:
         ny = cfg.ny
     if nx is None or ny is None:
-        raise ValueError("nx/ny must be set in numerical_config.yaml or layout_2d.yaml")
+        raise ValueError("nx/ny must be set in numerical_config.yaml or layout.yaml")
 
     world_spec: WorldSpec = {
         "xlim": world_raw["xlim"],
@@ -329,7 +329,7 @@ def load_layout2d_yaml(path: str | Path, *, config_path: str | Path | None = Non
         "nx": int(nx),
         "ny": int(ny),
     }
-    world = _to_world2d(
+    world = _to_world(
         world_spec,
         start_raw=layout.get("start"),
         goal_raw=layout.get("goal"),
@@ -354,11 +354,11 @@ def load_layout2d_yaml(path: str | Path, *, config_path: str | Path | None = Non
         if wall_thickness <= 0.0:
             raise ValueError("wall_thickness must be > 0")
 
-    obstacles: list[Obstacle2D] = []
+    obstacles: list[Obstacle] = []
     for o in obstacles_raw:
         otype = o.get("type", "box")
         if otype == "box":
-            box = _to_box2d(o)  # type: ignore[arg-type]
+            box = _to_box(o)  # type: ignore[arg-type]
             _validate_box_inside_world(
                 box.xmin,
                 box.xmax,
@@ -372,7 +372,7 @@ def load_layout2d_yaml(path: str | Path, *, config_path: str | Path | None = Non
         elif otype == "wall":
             if wall_thickness is None:
                 raise ValueError("wall_thickness is required when using wall obstacles.")
-            wall = _to_wall2d(
+            wall = _to_wall(
                 o,  # type: ignore[arg-type]
                 thickness=wall_thickness,
                 xlim=world.xlim,
@@ -391,11 +391,11 @@ def load_layout2d_yaml(path: str | Path, *, config_path: str | Path | None = Non
             obstacles.append(wall)
         else:
             raise ValueError(f"Unsupported obstacle type: {otype}.")
-    return Layout2D(world=world, obstacles=obstacles, wall_thickness=wall_thickness)
+    return Layout(world=world, obstacles=obstacles, wall_thickness=wall_thickness)
 
 
-def rasterize_occupancy_grid_2d(
-    layout: Layout2D,
+def rasterize_occupancy_grid(
+    layout: Layout,
 ) -> tuple[BoolArray, FloatArray, FloatArray]:
     """
     Returns:
@@ -414,7 +414,7 @@ def rasterize_occupancy_grid_2d(
 
     occ = np.zeros((w.nx, w.ny), dtype=np.bool_)
     for obs in layout.obstacles:
-        box = _wall_to_box(obs) if isinstance(obs, Wall2D) else obs
+        box = _wall_to_box(obs) if isinstance(obs, Wall) else obs
         mask = (box.xmin <= xx) & (xx <= box.xmax) & (box.ymin <= yy) & (yy <= box.ymax)
         occ |= mask
     # Treat outer frame as occupied wall.
@@ -481,7 +481,7 @@ def _parse_args():
     parser.add_argument(
         "--layout",
         default="",
-        help="Path to layout YAML. Defaults to layout_2d.yaml in this script directory.",
+        help="Path to layout YAML. Defaults to layout.yaml in this script directory.",
     )
     parser.add_argument(
         "--config",
@@ -501,10 +501,10 @@ def main() -> int:
     if args.layout:
         layout_path = Path(args.layout)
     else:
-        layout_path = Path(__file__).resolve().parent / "layout_2d.yaml"
+        layout_path = Path(__file__).resolve().parent / "layout.yaml"
     config_path = Path(args.config) if args.config else None
-    layout = load_layout2d_yaml(layout_path, config_path=config_path)
-    occ, xs, ys = rasterize_occupancy_grid_2d(layout)
+    layout = load_layout_yaml(layout_path, config_path=config_path)
+    occ, xs, ys = rasterize_occupancy_grid(layout)
 
     _ = plot_occupancy_grid(
         occ,

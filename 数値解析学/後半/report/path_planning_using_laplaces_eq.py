@@ -10,32 +10,32 @@ from laplace_path_planning_solver import (
     solve_laplace,
     trace_path_from_start,
 )
-from occupancy_grid_2d import load_layout2d_yaml, rasterize_occupancy_grid_2d
-from path_planning_utils_2d import goal_disk_indices
-from plot_laplace_2d import (
-    plot_laplace_2d,
+from occupancy_grid import load_layout_yaml, rasterize_occupancy_grid
+from path_planning_utils import goal_disk_indices
+from plot_laplace import (
+    plot_laplace,
     plot_laplace_surface_3d_pair,
-    plot_velocity_quiver_2d_pair,
+    plot_velocity_quiver_pair,
     plot_residual_history,
 )
 
 
 def main() -> int:
-    layout_path = Path(__file__).resolve().parent / "layout_2d.yaml"
+    layout_path = Path(__file__).resolve().parent / "layout.yaml"
     omega = 1.5
     max_iter = 10_000
     tol = 1.0e-5
     method = SolveMethod.SOR
 
-    layout = load_layout2d_yaml(layout_path)
+    layout = load_layout_yaml(layout_path)
     if layout.world.goal is None:
-        raise ValueError("goal must be set in layout_2d.yaml")
+        raise ValueError("goal must be set in layout.yaml")
     if layout.world.goal_radius is None:
-        raise ValueError("goal_radius must be set in layout_2d.yaml")
+        raise ValueError("goal_radius must be set in layout.yaml")
     if layout.world.start is None:
-        raise ValueError("start must be set in layout_2d.yaml")
+        raise ValueError("start must be set in layout.yaml")
 
-    occ, xs, ys = rasterize_occupancy_grid_2d(layout)
+    occ, xs, ys = rasterize_occupancy_grid(layout)
     boundary_mask = np.zeros_like(occ, dtype=bool)
     boundary_mask[0, :] = True
     boundary_mask[-1, :] = True
@@ -77,7 +77,7 @@ def main() -> int:
         start=layout.world.start,
     )
     path_xy = trace_result.path_xy
-    _ = plot_laplace_2d(
+    _ = plot_laplace(
         occ,
         xs,
         ys,
@@ -86,7 +86,7 @@ def main() -> int:
         goal=layout.world.goal,
         path_xy=path_xy,
     )
-    _ = plot_velocity_quiver_2d_pair(occ, xs, ys, result.u, result.v)
+    _ = plot_velocity_quiver_pair(occ, xs, ys, result.u, result.v)
     _ = plot_laplace_surface_3d_pair(xs, ys, result.phi, occ=occ)
     _ = plot_residual_history(
         result.residual_history,

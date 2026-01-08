@@ -21,7 +21,7 @@ def _path_to_xy(
     return xs[ix], ys[iy]
 
 
-def plot_laplace_2d(
+def plot_laplace(
     occ: BoolArray,
     xs: FloatArray,
     ys: FloatArray,
@@ -115,7 +115,7 @@ def plot_laplace_2d(
     return (ax_lin, ax_log)
 
 
-def plot_velocity_quiver_2d(
+def plot_velocity_quiver(
     occ: BoolArray,
     xs: FloatArray,
     ys: FloatArray,
@@ -178,7 +178,7 @@ def plot_velocity_quiver_2d(
     return ax
 
 
-def plot_velocity_quiver_2d_log(
+def plot_velocity_quiver_log(
     occ: BoolArray,
     xs: FloatArray,
     ys: FloatArray,
@@ -243,7 +243,7 @@ def plot_velocity_quiver_2d_log(
     return ax
 
 
-def plot_velocity_quiver_2d_pair(
+def plot_velocity_quiver_pair(
     occ: BoolArray,
     xs: FloatArray,
     ys: FloatArray,
@@ -255,8 +255,8 @@ def plot_velocity_quiver_2d_pair(
     import matplotlib.pyplot as plt
 
     fig, (ax_lin, ax_log) = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
-    plot_velocity_quiver_2d(occ, xs, ys, u, v, step=step, ax=ax_lin)
-    plot_velocity_quiver_2d_log(occ, xs, ys, u, v, step=step, ax=ax_log)
+    plot_velocity_quiver(occ, xs, ys, u, v, step=step, ax=ax_lin)
+    plot_velocity_quiver_log(occ, xs, ys, u, v, step=step, ax=ax_log)
     return ax_lin, ax_log
 
 
