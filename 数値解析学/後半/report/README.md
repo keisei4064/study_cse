@@ -8,8 +8,8 @@ core/
 problem_gen/
   drawio_to_layout.py                drawio から layout.yaml を生成
   occupancy_grid.py                  layout + config の読込と格子化
-  layout.drawio                      drawio レイアウト
-  layout.yaml                        レイアウト定義（world/障害物/start/goal）
+  maps/layout_a.drawio               drawio レイアウト
+  maps/layout_a.yaml                 レイアウト定義（world/障害物/start/goal）
   numerical_config.yaml              数値計算設定（nx, ny など）
 viz/
   plot_laplace.py                    可視化ユーティリティ

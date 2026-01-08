@@ -307,7 +307,7 @@ def load_layout_yaml(path: str | Path, *, config_path: str | Path | None = None)
 
     cfg: NumericalConfig | None = None
     if config_path is None:
-        config_path = p.with_name("numerical_config.yaml")
+        config_path = p.parent.parent / "numerical_config.yaml"
     if config_path is not None:
         cfg_path = Path(config_path)
         if cfg_path.exists():
@@ -481,7 +481,7 @@ def _parse_args():
     parser.add_argument(
         "--layout",
         default="",
-        help="Path to layout YAML. Defaults to layout.yaml in this script directory.",
+        help="Path to layout YAML. Defaults to maps/layout_a.yaml in this script directory.",
     )
     parser.add_argument(
         "--config",
@@ -501,7 +501,7 @@ def main() -> int:
     if args.layout:
         layout_path = Path(args.layout)
     else:
-        layout_path = Path(__file__).resolve().parent / "layout.yaml"
+        layout_path = Path(__file__).resolve().parent / "maps" / "layout_a.yaml"
     config_path = Path(args.config) if args.config else None
     layout = load_layout_yaml(layout_path, config_path=config_path)
     occ, xs, ys = rasterize_occupancy_grid(layout)

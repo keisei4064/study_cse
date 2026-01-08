@@ -231,7 +231,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Parse drawio and emit layout.yaml."
     )
-    default_path = Path(__file__).resolve().parent / "layout.drawio"
+    default_path = Path(__file__).resolve().parent / "maps" / "layout_a.drawio"
     parser.add_argument(
         "drawio",
         nargs="?",
@@ -240,7 +240,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--output",
-        default=str(Path(__file__).resolve().parent / "layout.yaml"),
+        default=str(Path(__file__).resolve().parent / "maps" / "layout_a.yaml"),
         help="Path to output layout.yaml",
     )
     parser.add_argument("--nx", type=int, default=22, help="Grid cells in x.")

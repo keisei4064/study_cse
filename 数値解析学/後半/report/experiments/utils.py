@@ -26,7 +26,7 @@ def ensure_report_on_syspath() -> None:
 
 
 def default_layout_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "problem_gen" / "layout.yaml"
+    return Path(__file__).resolve().parents[1] / "problem_gen" / "maps" / "layout_a.yaml"
 
 
 def make_output_dir(exp_name: str) -> Path:
@@ -116,6 +116,8 @@ def build_problem_with_grid_size(layout_path: Path, nx: int, ny: int):
 
     wall_indices = {tuple(idx) for idx in np.argwhere(boundary_mask)}
     obstacle_indices = {tuple(idx) for idx in np.argwhere(obstacle_mask)}
+    if world_resized.goal is None or world_resized.goal_radius is None:
+        raise ValueError("goal and goal_radius must be set in layout.yaml")
     goal_indices = {
         (i, j)
         for (i, j) in goal_disk_indices(
