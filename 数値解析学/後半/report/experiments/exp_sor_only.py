@@ -1,18 +1,25 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
 from pathlib import Path
+import sys
+
+# Ensure the report root is on sys.path for local imports.
+REPORT_ROOT = Path(__file__).resolve().parents[1]
+if str(REPORT_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPORT_ROOT))
 
 import numpy as np
 
-from laplace_path_planning_solver import (
+from core.laplace_path_planning_solver import (
     ProblemSpec,
     SolveMethod,
     solve_laplace,
     trace_path_from_start,
 )
-from occupancy_grid import load_layout_yaml, rasterize_occupancy_grid
-from path_planning_utils import goal_disk_indices
-from plot_laplace import (
+from core.path_planning_utils import goal_disk_indices
+from problem_gen.occupancy_grid import load_layout_yaml, rasterize_occupancy_grid
+from viz.plot_laplace import (
     plot_laplace,
     plot_laplace_surface_3d_pair,
     plot_velocity_quiver_pair,
@@ -21,7 +28,7 @@ from plot_laplace import (
 
 
 def main() -> int:
-    layout_path = Path(__file__).resolve().parent / "layout.yaml"
+    layout_path = Path(__file__).resolve().parents[1] / "problem_gen" / "layout.yaml"
     omega = 1.5
     max_iter = 10_000
     tol = 1.0e-5
