@@ -10,7 +10,12 @@ import csv
 
 from core.laplace_path_planning_solver import ProblemSpec
 from core.path_planning_utils import goal_disk_indices
-from problem_gen.occupancy_grid import load_layout_yaml, rasterize_occupancy_grid
+from problem_gen.occupancy_grid import (
+    Layout,
+    World,
+    load_layout_yaml,
+    rasterize_occupancy_grid,
+)
 
 
 def ensure_report_on_syspath() -> None:
@@ -77,6 +82,58 @@ def build_problem_with_grid(layout_path: Path):
     occ, xs, ys = rasterize_occupancy_grid(layout)
     problem = build_problem(layout_path)
     return layout, problem, occ, xs, ys
+
+
+def build_problem_with_grid_size(layout_path: Path, nx: int, ny: int):
+    layout = load_layout_yaml(layout_path)
+    world = layout.world
+    if world.goal is None:
+        raise ValueError("goal must be set in layout.yaml")
+    if world.goal_radius is None:
+        raise ValueError("goal_radius must be set in layout.yaml")
+    world_resized = World(
+        xlim=world.xlim,
+        ylim=world.ylim,
+        nx=nx,
+        ny=ny,
+        start=world.start,
+        goal=world.goal,
+        goal_radius=world.goal_radius,
+    )
+    layout_resized = Layout(
+        world=world_resized,
+        obstacles=layout.obstacles,
+        wall_thickness=layout.wall_thickness,
+    )
+    occ, xs, ys = rasterize_occupancy_grid(layout_resized)
+
+    boundary_mask = np.zeros_like(occ, dtype=bool)
+    boundary_mask[0, :] = True
+    boundary_mask[-1, :] = True
+    boundary_mask[:, 0] = True
+    boundary_mask[:, -1] = True
+    obstacle_mask = occ & ~boundary_mask
+
+    wall_indices = {tuple(idx) for idx in np.argwhere(boundary_mask)}
+    obstacle_indices = {tuple(idx) for idx in np.argwhere(obstacle_mask)}
+    goal_indices = {
+        (i, j)
+        for (i, j) in goal_disk_indices(
+            world_resized.goal,
+            world_resized.goal_radius,
+            xs,
+            ys,
+        )
+        if not boundary_mask[i, j] and not obstacle_mask[i, j]
+    }
+    problem = ProblemSpec(
+        xs=xs,
+        ys=ys,
+        wall_indices=wall_indices,
+        obstacle_indices=obstacle_indices,
+        goal_indices=goal_indices,
+    )
+    return layout_resized, problem, occ, xs, ys
 
 
 def plot_residual_histories(

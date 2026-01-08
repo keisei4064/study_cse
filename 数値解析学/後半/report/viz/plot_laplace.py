@@ -224,7 +224,15 @@ def plot_laplace_log_only(
     ax.set_ylabel(r"$y$")
     ax.set_title(r"$-\log_{10}(1 - \phi)$", pad=15)
     ax.set_aspect("equal")
-    plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label=r"$-\log_{10}(1 - \phi)$")
+    fig = ax.get_figure()
+    assert fig is not None
+    fig.colorbar(
+        im,
+        ax=ax,
+        fraction=0.046,
+        pad=0.04,
+        label=r"$-\log_{10}(1 - \phi)$",
+    )
     return ax
 
 
@@ -243,7 +251,8 @@ def plot_velocity_quiver(
     if ax is None:
         _, ax = plt.subplots()
 
-    stride = step if step is not None else max(1, min(xs.size, ys.size) // 20)
+    target_arrows = 25
+    stride = step if step is not None else max(1, int(np.ceil(max(xs.size, ys.size) / target_arrows)))
     boundary_mask = np.zeros_like(occ, dtype=bool)
     boundary_mask[0, :] = True
     boundary_mask[-1, :] = True
@@ -258,7 +267,9 @@ def plot_velocity_quiver(
     uu_unit = uu / speed_safe
     vv_unit = vv / speed_safe
 
-    grid_scale = 0.5 * min(float(xs[1] - xs[0]), float(ys[1] - ys[0]))
+    span_x = float(xs[-1] - xs[0])
+    span_y = float(ys[-1] - ys[0])
+    grid_scale = 0.75 * min(span_x, span_y) / target_arrows
     extent = (xs[0], xs[-1], ys[0], ys[-1])
     ax.imshow(
         occ.T,
@@ -281,6 +292,8 @@ def plot_velocity_quiver(
         scale_units="xy",
         scale=1.0,
         width=0.0025,
+        headwidth=4.0,
+        headlength=5.0,
         cmap="viridis",
     )
     ax.set_xlabel(r"$x$")
@@ -306,7 +319,8 @@ def plot_velocity_quiver_log(
     if ax is None:
         _, ax = plt.subplots()
 
-    stride = step if step is not None else max(1, min(xs.size, ys.size) // 20)
+    target_arrows = 25
+    stride = step if step is not None else max(1, int(np.ceil(max(xs.size, ys.size) / target_arrows)))
     boundary_mask = np.zeros_like(occ, dtype=bool)
     boundary_mask[0, :] = True
     boundary_mask[-1, :] = True
@@ -321,7 +335,9 @@ def plot_velocity_quiver_log(
     uu_unit = uu / speed_safe
     vv_unit = vv / speed_safe
 
-    grid_scale = 0.5 * min(float(xs[1] - xs[0]), float(ys[1] - ys[0]))
+    span_x = float(xs[-1] - xs[0])
+    span_y = float(ys[-1] - ys[0])
+    grid_scale = 0.75 * min(span_x, span_y) / target_arrows
     extent = (xs[0], xs[-1], ys[0], ys[-1])
     ax.imshow(
         occ.T,
@@ -346,6 +362,8 @@ def plot_velocity_quiver_log(
         scale_units="xy",
         scale=1.0,
         width=0.0025,
+        headwidth=4.0,
+        headlength=5.0,
         cmap="viridis",
     )
     ax.set_xlabel(r"$x$")
