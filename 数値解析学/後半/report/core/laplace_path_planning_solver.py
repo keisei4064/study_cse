@@ -141,7 +141,7 @@ def solve_laplace(
                             phi_prev[i, j - 1] - 2 * phi_prev[i, j] + phi_prev[i, j + 1]
                         ) / dy2  # 2Dラプラシアン
 
-                        # ヤコビ更新
+                        # ヤコビ法による更新
                         phi[i, j] = phi_prev[i, j] + r / L
 
                         if abs(r) > res_max:
@@ -159,8 +159,8 @@ def solve_laplace(
                             phi[i, j - 1] - 2 * phi[i, j] + phi[i, j + 1]
                         ) / dy2  # 2Dラプラシアン
 
-                        # ガウスザイデル更新
-                        phi[i, j] += r / L
+                        # ガウスザイデル法による更新
+                        phi[i, j] = phi[i, j] + r / L
 
                         if abs(r) > res_max:
                             res_max = abs(r)
@@ -177,8 +177,8 @@ def solve_laplace(
                             phi[i, j - 1] - 2 * phi[i, j] + phi[i, j + 1]
                         ) / dy2  # 2Dラプラシアン
 
-                        # SOR 更新
-                        phi[i, j] += omega * r / L
+                        # SOR法による更新
+                        phi[i, j] = phi[i, j] + omega * r / L
 
                         if abs(r) > res_max:
                             res_max = abs(r)
@@ -187,6 +187,9 @@ def solve_laplace(
         if res_max0 is None:
             res_max0 = res_max
         assert res_max0, "絶対に数値持ってるはず"
+        if res_max0 == 0:
+            # （初回で解なら終了）
+            break
         res_norm = res_max / res_max0
 
         # 履歴に記録
