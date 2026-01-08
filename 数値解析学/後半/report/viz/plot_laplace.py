@@ -150,6 +150,84 @@ def plot_laplace(
     return (ax_lin, ax_log)
 
 
+def plot_laplace_log_only(
+    occ: BoolArray,
+    xs: FloatArray,
+    ys: FloatArray,
+    phi: FloatArray,
+    *,
+    start: Tuple[float, float] | None = None,
+    goal: Tuple[float, float] | None = None,
+    path: Iterable[Tuple[int, int]] | None = None,
+    path_xy: Iterable[Tuple[float, float]] | None = None,
+    ax=None,
+):
+    import matplotlib.pyplot as plt
+
+    if ax is None:
+        _, ax = plt.subplots()
+
+    extent = (xs[0], xs[-1], ys[0], ys[-1])
+    ax.imshow(
+        occ.T,
+        origin="lower",
+        extent=extent,
+        cmap="gray_r",
+        interpolation="nearest",
+    )
+    boundary_mask = np.zeros_like(occ, dtype=bool)
+    boundary_mask[0, :] = True
+    boundary_mask[-1, :] = True
+    boundary_mask[:, 0] = True
+    boundary_mask[:, -1] = True
+    phi_masked = np.ma.masked_array(phi, mask=(occ | boundary_mask))
+    phi_inv = 1.0 - phi_masked
+    phi_clipped = np.clip(phi_inv, 1.0e-12, None)
+    phi_log = -np.log10(phi_clipped)
+    im = ax.imshow(
+        phi_log.T,
+        origin="lower",
+        extent=extent,
+        cmap="viridis",
+        interpolation="nearest",
+    )
+
+    if path is not None:
+        path_x, path_y = _path_to_xy(path, xs, ys)
+        ax.plot(path_x, path_y, color="tab:orange", linewidth=2.0)
+    if path_xy is not None:
+        points = list(path_xy)
+        if points:
+            px = [p[0] for p in points]
+            py = [p[1] for p in points]
+            ax.plot(px, py, color="tab:orange", linewidth=2.0)
+    if start is not None:
+        ax.plot(
+            start[0],
+            start[1],
+            marker="o",
+            markersize=7,
+            color="tab:blue",
+            linestyle="None",
+        )
+    if goal is not None:
+        ax.plot(
+            goal[0],
+            goal[1],
+            marker="*",
+            markersize=12,
+            color="tab:red",
+            linestyle="None",
+        )
+
+    ax.set_xlabel(r"$x$")
+    ax.set_ylabel(r"$y$")
+    ax.set_title(r"$-\log_{10}(1 - \phi)$", pad=15)
+    ax.set_aspect("equal")
+    plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label=r"$-\log_{10}(1 - \phi)$")
+    return ax
+
+
 def plot_velocity_quiver(
     occ: BoolArray,
     xs: FloatArray,
