@@ -8,13 +8,13 @@ import numpy as np
 import numpy.typing as npt
 
 
-BoolArray = npt.NDArray[np.bool_]
 FloatArray = npt.NDArray[np.float64]
 
 
-DIRICHLET_WALL_VALUE = 1.0
-
-DirichletCondition = Tuple[Tuple[int, int], float]
+DIRICHLET_WALL_VALUE = 1.0  # 外壁・障害物のディリクレ境界値
+DIRICHLET_GOAL_VALUE = 0.0  # ゴール領域のディリクレ境界値
+TRACE_STEP_SCALE = 0.5  # 経路追跡の1ステップ長さ係数（格子幅に対する比）
+TRACE_MAX_STEPS = 5000  # 経路追跡の最大ステップ数
 
 
 class SolveMethod(Enum):
@@ -22,7 +22,16 @@ class SolveMethod(Enum):
 
 
 @dataclass(frozen=True)
-class SolveResult:
+class ProblemSpec:
+    xs: FloatArray
+    ys: FloatArray
+    wall_indices: set[Tuple[int, int]]
+    obstacle_indices: set[Tuple[int, int]]
+    goal_indices: set[Tuple[int, int]]
+
+
+@dataclass(frozen=True)
+class LaplaceResult:
     phi: FloatArray
     u: FloatArray
     v: FloatArray
@@ -31,27 +40,32 @@ class SolveResult:
     residual_norm_history: list[float]
 
 
+@dataclass(frozen=True)
+class TraceResult:
+    path_xy: list[Tuple[float, float]]
+    steps: int
+
+
 def solve_laplace(
-    occ: BoolArray,
-    xs: FloatArray,
-    ys: FloatArray,
+    problem: ProblemSpec,
     *,
-    dirichlet_conditions: list[DirichletCondition],
     method: SolveMethod = SolveMethod.SOR,
     omega: float | None = 1.5,
     max_iter: int = 10_000,
     tol: float = 1.0e-5,
-    boundary_value: float = DIRICHLET_WALL_VALUE,
-) -> SolveResult:
+) -> LaplaceResult:
     """
     2D Laplace 方程式を反復法で解く（数値計算部分のみ）。
 
     境界条件:
-        - 外壁 + 障害物は Dirichlet: u = boundary_value (>0)
-        - dirichlet_conditions で指定した点は Dirichlet（個別値）
+        - 外壁は Dirichlet: u = boundary_value (>0)
+        - 障害物内部は Dirichlet（計算スキップ）
+        - ゴール領域は Dirichlet: u = DIRICHLET_GOAL_VALUE
         - スタート点は固定しない
     """
-    nx, ny = occ.shape
+    xs = problem.xs
+    ys = problem.ys
+    nx, ny = xs.size, ys.size
     dx = float(xs[1] - xs[0])
     dy = float(ys[1] - ys[0])
     dx2 = dx * dx
@@ -59,27 +73,22 @@ def solve_laplace(
     L = 2.0 / dx2 + 2.0 / dy2
 
     # ポテンシャル場の初期値
-    phi = np.full((nx, ny), boundary_value, dtype=np.float64)
+    phi = np.full((nx, ny), DIRICHLET_WALL_VALUE, dtype=np.float64)
 
-    # Dirichlet で固定するセル（外壁 + 障害物 + dirichlet_conditions）
-    is_dirichlet = np.zeros_like(occ, dtype=np.bool_)
-    is_dirichlet[0, :] = True
-    is_dirichlet[-1, :] = True
-    is_dirichlet[:, 0] = True
-    is_dirichlet[:, -1] = True
-    is_dirichlet |= occ
-    for (i, j), _ in dirichlet_conditions:
+    # Dirichlet で固定するセル（外壁 + 障害物 + ゴール）
+    is_dirichlet = np.zeros((nx, ny), dtype=np.bool_)
+    for i, j in problem.wall_indices:
+        is_dirichlet[i, j] = True
+    for i, j in problem.obstacle_indices:
+        is_dirichlet[i, j] = True
+    for i, j in problem.goal_indices:
         is_dirichlet[i, j] = True
 
     # ---- 初期条件の設定 ----
-    # 外壁/障害物/dirichlet_conditions をそれぞれ指定値で設定
-    phi[is_dirichlet] = boundary_value
-    phi[0, :] = boundary_value
-    phi[-1, :] = boundary_value
-    phi[:, 0] = boundary_value
-    phi[:, -1] = boundary_value
-    for (i, j), value in dirichlet_conditions:
-        phi[i, j] = value
+    # 外壁/障害物/ゴールをそれぞれ指定値で設定
+    phi[is_dirichlet] = DIRICHLET_WALL_VALUE
+    for i, j in problem.goal_indices:
+        phi[i, j] = DIRICHLET_GOAL_VALUE
 
     res_max0: float | None = None
     iterations = 0
@@ -147,7 +156,7 @@ def solve_laplace(
             u[i, j] = (phi[ip1, j] - phi[im1, j]) / dx1
             v[i, j] = (phi[i, jp1] - phi[i, jm1]) / dy1
 
-    return SolveResult(
+    return LaplaceResult(
         phi=phi,
         u=u,
         v=v,
@@ -157,66 +166,37 @@ def solve_laplace(
     )
 
 
-def _closest_index(values: FloatArray, target: float) -> int:
-    return int(np.argmin(np.abs(values - target)))
-
-
-def goal_disk_indices(
-    goal: Tuple[float, float],
-    radius: float,
-    xs: FloatArray,
-    ys: FloatArray,
-) -> list[Tuple[int, int]]:
-    nx, ny = xs.size, ys.size
-    gx, gy = goal
-    dx = float(xs[1] - xs[0])
-    dy = float(ys[1] - ys[0])
-    r_ix = int(np.ceil(radius / dx))
-    r_iy = int(np.ceil(radius / dy))
-
-    ig = _closest_index(xs, gx)
-    jg = _closest_index(ys, gy)
-    indices: list[Tuple[int, int]] = []
-    for i in range(max(0, ig - r_ix), min(nx, ig + r_ix + 1)):
-        for j in range(max(0, jg - r_iy), min(ny, jg + r_iy + 1)):
-            if (xs[i] - gx) ** 2 + (ys[j] - gy) ** 2 <= radius * radius:
-                indices.append((i, j))
-    return indices
-
-
 def trace_path_from_start(
-    start: Tuple[float, float],
-    goal: Tuple[float, float],
-    goal_radius: float,
-    xs: FloatArray,
-    ys: FloatArray,
-    u: FloatArray,
-    v: FloatArray,
+    problem: ProblemSpec,
+    trace_input: LaplaceResult,
     *,
-    max_steps: int = 5000,
-    step_scale: float = 0.5,
-) -> list[Tuple[float, float]]:
+    start: Tuple[float, float],
+) -> TraceResult:
+    xs = problem.xs
+    ys = problem.ys
     dx = float(xs[1] - xs[0])
     dy = float(ys[1] - ys[0])
-    step = step_scale * min(dx, dy)
+    step = TRACE_STEP_SCALE * min(dx, dy)
     x0, x1 = float(xs[0]), float(xs[-1])
     y0, y1 = float(ys[0]), float(ys[-1])
 
     path: list[Tuple[float, float]] = [start]
     x, y = start
-    # TODO(report): 経路生成が連続座標ステップなので、レポートで妥当性/比較を要検討。
-    for _ in range(max_steps):
-        if (x - goal[0]) ** 2 + (y - goal[1]) ** 2 <= goal_radius * goal_radius:
-            break
+    steps = 0
+    for _ in range(TRACE_MAX_STEPS):
+        steps += 1
         if not (x0 <= x <= x1 and y0 <= y <= y1):
             break
 
-        i = _closest_index(xs, x)
-        j = _closest_index(ys, y)
+        # 現在位置に最も近い格子点を選ぶ
+        i = int(np.argmin(np.abs(xs - x)))
+        j = int(np.argmin(np.abs(ys - y)))
+        if (i, j) in problem.goal_indices:
+            break
 
         # 低ポテンシャル側へ進む
-        ux = -float(u[i, j])
-        vy = -float(v[i, j])
+        ux = -float(trace_input.u[i, j])
+        vy = -float(trace_input.v[i, j])
         norm = (ux * ux + vy * vy) ** 0.5
         if norm == 0.0:
             break
@@ -224,4 +204,4 @@ def trace_path_from_start(
         y += step * vy / norm
         path.append((x, y))
 
-    return path
+    return TraceResult(path_xy=path, steps=steps)

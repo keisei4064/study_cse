@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
+
 from laplace_path_planning_solver import (
+    ProblemSpec,
     SolveMethod,
-    goal_disk_indices,
     solve_laplace,
     trace_path_from_start,
 )
 from occupancy_grid_2d import load_layout2d_yaml, rasterize_occupancy_grid_2d
+from path_planning_utils_2d import goal_disk_indices
 from plot_laplace_2d import (
     plot_laplace_2d,
     plot_laplace_surface_3d_pair,
@@ -33,35 +36,47 @@ def main() -> int:
         raise ValueError("start must be set in layout_2d.yaml")
 
     occ, xs, ys = rasterize_occupancy_grid_2d(layout)
-    goal_indices = goal_disk_indices(
-        layout.world.goal,
-        layout.world.goal_radius,
-        xs,
-        ys,
-    )
-    dirichlet_conditions = [
-        ((i, j), 0.0) for (i, j) in goal_indices if not occ[i, j]
-    ]
+    boundary_mask = np.zeros_like(occ, dtype=bool)
+    boundary_mask[0, :] = True
+    boundary_mask[-1, :] = True
+    boundary_mask[:, 0] = True
+    boundary_mask[:, -1] = True
+    obstacle_mask = occ & ~boundary_mask
 
+    wall_indices = {tuple(idx) for idx in np.argwhere(boundary_mask)}
+    obstacle_indices = {tuple(idx) for idx in np.argwhere(obstacle_mask)}
+
+    goal_indices = {
+        (i, j)
+        for (i, j) in goal_disk_indices(
+            layout.world.goal,
+            layout.world.goal_radius,
+            xs,
+            ys,
+        )
+        if not boundary_mask[i, j] and not obstacle_mask[i, j]
+    }
+
+    problem = ProblemSpec(
+        xs=xs,
+        ys=ys,
+        wall_indices=wall_indices,
+        obstacle_indices=obstacle_indices,
+        goal_indices=goal_indices,
+    )
     result = solve_laplace(
-        occ,
-        xs,
-        ys,
-        dirichlet_conditions=dirichlet_conditions,
+        problem,
         method=method,
         omega=omega,
         max_iter=max_iter,
         tol=tol,
     )
-    path_xy = trace_path_from_start(
-        layout.world.start,
-        layout.world.goal,
-        layout.world.goal_radius,
-        xs,
-        ys,
-        result.u,
-        result.v,
+    trace_result = trace_path_from_start(
+        problem,
+        result,
+        start=layout.world.start,
     )
+    path_xy = trace_result.path_xy
     _ = plot_laplace_2d(
         occ,
         xs,
