@@ -46,6 +46,7 @@ class LaplaceResult:
     iterations: int  # 反復回数
     residual_history: list[float]  # 残差の履歴
     residual_norm_history: list[float]  # 正規化した残差の履歴
+    phi_history: list[FloatArray]  # 反復ごとのポテンシャル履歴
 
 
 # 経路生成の結果をまとめたデータクラス
@@ -110,6 +111,7 @@ def solve_laplace(
     iterations = 0
     residual_history: list[float] = []
     residual_norm_history: list[float] = []
+    phi_history: list[FloatArray] = [phi.copy()]
 
     # ポテンシャルを計算
     for iter_count in range(1, MAX_ITER + 1):
@@ -196,6 +198,7 @@ def solve_laplace(
         # 履歴に記録
         residual_history.append(res_max)
         residual_norm_history.append(res_norm)
+        phi_history.append(phi.copy())
 
         # 終了判定
         if res_norm <= TOL:
@@ -226,6 +229,7 @@ def solve_laplace(
         iterations=iterations,
         residual_history=residual_history,
         residual_norm_history=residual_norm_history,
+        phi_history=phi_history,
     )
 
 

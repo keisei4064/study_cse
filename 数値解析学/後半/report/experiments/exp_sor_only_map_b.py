@@ -4,6 +4,8 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
+import numpy as np
+
 # ローカルimportを通すため、report直下を sys.path に追加する
 REPORT_ROOT = Path(__file__).resolve().parents[1]
 if str(REPORT_ROOT) not in sys.path:
@@ -106,6 +108,62 @@ def main() -> int:
     fig_res.tight_layout()
     fig_res.savefig(output_dir / "residual_history.png", dpi=200)
     import matplotlib.pyplot as plt
+    from matplotlib import animation
+
+    fig_anim = plt.figure(figsize=(6.8, 5.6))
+    ax_anim = fig_anim.add_subplot(111, projection="3d")
+    X, Y = np.meshgrid(xs, ys, indexing="ij")
+    mask = occ
+
+    def _phi_log(phi: np.ndarray) -> np.ndarray:
+        phi_inv = 1.0 - phi
+        phi_inv = np.ma.masked_array(phi_inv, mask=mask)
+        return -np.log10(np.clip(phi_inv, 1.0e-12, None))
+
+    surf = ax_anim.plot_surface(
+        X,
+        Y,
+        _phi_log(result.phi_history[0]),
+        cmap="viridis",
+        linewidth=0.0,
+        antialiased=True,
+    )
+    ax_anim.set_xlabel(r"$x$")
+    ax_anim.set_ylabel(r"$y$")
+    ax_anim.set_zlabel(r"$-\log_{10}(1 - \phi)$", labelpad=8)
+    ax_anim.set_title(r"$-\log_{10}(1 - \phi)$", pad=15)
+    ax_anim.view_init(elev=50, azim=-60)
+    ax_anim.set_proj_type("persp", focal_length=0.9)
+    ax_anim.margins(x=0.07, y=0.07)
+    ax_anim.set_box_aspect((1.0, 1.0, 0.6))
+    fig_anim.colorbar(surf, ax=ax_anim, shrink=0.7, pad=0.15, label=r"$-\log_{10}(1 - \phi)$")
+
+    def _update(frame_idx: int):
+        nonlocal surf
+        surf.remove()
+        surf = ax_anim.plot_surface(
+            X,
+            Y,
+            _phi_log(result.phi_history[frame_idx]),
+            cmap="viridis",
+            linewidth=0.0,
+            antialiased=True,
+        )
+        ax_anim.set_title(rf"$-\log_{{10}}(1 - \phi)$  (iter {frame_idx})", pad=15)
+        return (surf,)
+
+    anim = animation.FuncAnimation(
+        fig_anim,
+        _update,
+        frames=len(result.phi_history),
+        interval=75,
+        blit=False,
+    )
+    anim.save(
+        output_dir / "potential_field_3d_log.gif",
+        writer="pillow",
+        fps=10,
+    )
 
     # 計測結果の出力
     print(f"CPU time (solver): {t_solver:.6f} s")
