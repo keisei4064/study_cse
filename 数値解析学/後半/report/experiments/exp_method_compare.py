@@ -24,7 +24,8 @@ def _methods():
     return [
         ("Jacobi", SolveMethod.JACOBI, None),
         ("Gauss-Seidel", SolveMethod.GAUSS_SEIDEL, None),
-        ("SOR (omega=1.5)", SolveMethod.SOR, 1.5),
+        # ("SOR (omega=1.5)", SolveMethod.SOR, 1.5),
+        ("SOR", SolveMethod.SOR, 1.5),
     ]
 
 
@@ -62,10 +63,14 @@ def main() -> int:
     fig0, ax0 = plt.subplots()
     for label, result in results:
         ax0.plot(result.residual_norm_history, label=label)
+    line_colors = {
+        label: line.get_color()
+        for (label, _), line in zip(results, ax0.lines, strict=True)
+    }
     ax0.set_yscale("log")
     ax0.set_xlabel("iteration")
     ax0.set_ylabel(r"$\frac{\max |r_i|}{\max |r_0|}$", fontsize=15)
-    ax0.set_title("Residual histories by method", pad=15)
+    ax0.set_title("Residual histories", pad=15)
     ax0.set_xlim(left=0)
     ax0.grid(True, alpha=0.3)
     ax0.legend(fontsize="small")
@@ -73,23 +78,23 @@ def main() -> int:
     fig0.savefig(output_dir / "residual_histories.png", dpi=200)
 
     # 反復回数の比較
-    fig1, ax1 = plt.subplots(figsize=(5.5, 4))
+    fig1, ax1 = plt.subplots(figsize=(3, 4))
     labels = [label for label, _ in iterations]
     iters = [value for _, value in iterations]
-    ax1.bar(labels, iters, color="tab:blue", width=0.6)
+    ax1.bar(labels, iters, color=[line_colors[label] for label in labels], width=0.3)
     ax1.set_ylabel("iterations to convergence")
-    ax1.set_title("Iterations to convergence by method", pad=15)
+    ax1.set_title("Iterations to convergence", pad=15)
     ax1.grid(True, axis="y", alpha=0.3)
     fig1.tight_layout()
     fig1.savefig(output_dir / "iterations_by_method.png", dpi=200)
 
     # CPU time の比較
-    fig2, ax2 = plt.subplots(figsize=(5.5, 4))
+    fig2, ax2 = plt.subplots(figsize=(3, 4))
     labels = [label for label, _ in timings]
     times = [value for _, value in timings]
-    ax2.bar(labels, times, color="tab:orange", width=0.6)
+    ax2.bar(labels, times, color=[line_colors[label] for label in labels], width=0.3)
     ax2.set_ylabel("CPU time [s]")
-    ax2.set_title("CPU time by method", pad=15)
+    ax2.set_title("CPU time", pad=15)
     ax2.grid(True, axis="y", alpha=0.3)
     fig2.tight_layout()
     fig2.savefig(output_dir / "cpu_time_by_method.png", dpi=200)

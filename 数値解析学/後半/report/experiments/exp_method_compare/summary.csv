@@ -1,4 +1,4 @@
 method,iterations,cpu_seconds
-Jacobi,152,0.285183
-Gauss-Seidel,92,0.169889
-SOR (omega=1.5),37,0.070817
+Jacobi,152,0.322778
+Gauss-Seidel,92,0.165567
+SOR,37,0.070575
