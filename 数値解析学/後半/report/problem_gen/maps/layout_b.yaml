@@ -6,8 +6,8 @@ world:
   - 0.0
   - 2.0
 start:
-- 1.71
-- 1.69
+- 1.86
+- 1.79
 goal:
 - 0.2
 - 0.55
@@ -17,37 +17,49 @@ obstacles:
   x0: 1.0
   y0: 0.0
   x1: 1.0
-  y1: 0.4
+  y1: 0.35
 - name: wall2
   type: wall
   x0: 2.0
   y0: 1.0
-  x1: 1.8
+  x1: 1.75
   y1: 1.0
 - name: wall3
   type: wall
-  x0: 0.45
+  x0: 0.5
   y0: 1.0
   x1: 0.0
   y1: 1.0
 - name: wall4
   type: wall
   x0: 1.0
-  y0: 0.7
+  y0: 0.55
   x1: 1.0
   y1: 1.6
 - name: wall5
   type: wall
   x0: 1.0
-  y0: 1.85
+  y0: 1.8
   x1: 1.0
   y1: 2.0
 - name: wall6
   type: wall
-  x0: 1.45
+  x0: 1.55
   y0: 1.0
-  x1: 0.8
+  x1: 0.7
   y1: 1.0
+- name: wall7
+  type: wall
+  x0: 1.45
+  y0: 1.6
+  x1: 1.45
+  y1: 1.8
+- name: wall8
+  type: wall
+  x0: 1.45
+  y0: 1.6
+  x1: 2.0
+  y1: 1.6
 - name: box1
   type: box
   xmin: 1.25
@@ -71,4 +83,4 @@ obstacles:
   xmin: 1.0
   xmax: 1.5
   ymin: 1.0
-  ymax: 1.5
+  ymax: 1.35

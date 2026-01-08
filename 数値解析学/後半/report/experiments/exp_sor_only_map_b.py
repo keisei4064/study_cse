@@ -52,7 +52,7 @@ def main() -> int:
     method = SolveMethod.SOR
 
     # レイアウト読み込みと必須パラメータの検証
-    layout, problem, occ, xs, ys = build_problem_with_grid_size(layout_path, 60, 60)
+    layout, problem, occ, xs, ys = build_problem_with_grid_size(layout_path, 40, 40)
     if layout.world.start is None:
         raise ValueError("start must be set in layout.yaml")
     # ラプラス方程式を SOR で解く（CPU time）
