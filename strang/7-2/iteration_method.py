@@ -55,7 +55,6 @@ def jacobi(A: FloatArray, b: FloatArray, x0: FloatArray, iters: int) -> IterResu
         x0: 初期値。
         iters: 反復回数。
     """
-    n: int = A.shape[0]
     D: FloatArray = np.diag(A).copy()
     R: FloatArray = A - np.diag(D)
     x: FloatArray = x0.copy()

@@ -36,16 +36,11 @@ def plot_laplace(
     import matplotlib.pyplot as plt
 
     if ax is None:
-        _, (ax_lin, ax_log) = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
+        _, (ax_lin, ax_log) = plt.subplots(1, 2, figsize=(10, 4))
     else:
         ax_lin, ax_log = ax
 
-    if xs.size > 1 and ys.size > 1:
-        dx = float(xs[1] - xs[0])
-        dy = float(ys[1] - ys[0])
-        extent = (xs[0] - dx / 2, xs[-1] + dx / 2, ys[0] - dy / 2, ys[-1] + dy / 2)
-    else:
-        extent = (xs[0], xs[-1], ys[0], ys[-1])
+    extent = (xs[0], xs[-1], ys[0], ys[-1])
     ax_lin.imshow(
         occ.T,
         origin="lower",
@@ -87,31 +82,71 @@ def plot_laplace(
 
     if path is not None:
         path_x, path_y = _path_to_xy(path, xs, ys)
-        ax_lin.plot(path_x, path_y, color="tab:orange", linewidth=2.0)
-        ax_log.plot(path_x, path_y, color="tab:orange", linewidth=2.0)
+        ax_lin.plot(path_x, path_y, color="tab:orange", linewidth=2.0, label="path")
+        ax_log.plot(path_x, path_y, color="tab:orange", linewidth=2.0, label="path")
     if path_xy is not None:
         points = list(path_xy)
         if points:
             px = [p[0] for p in points]
             py = [p[1] for p in points]
-            ax_lin.plot(px, py, color="tab:orange", linewidth=2.0)
-            ax_log.plot(px, py, color="tab:orange", linewidth=2.0)
+            ax_lin.plot(px, py, color="tab:orange", linewidth=2.0, label="path")
+            ax_log.plot(px, py, color="tab:orange", linewidth=2.0, label="path")
     if start is not None:
-        ax_lin.plot(start[0], start[1], marker="o", markersize=7, color="tab:blue")
-        ax_log.plot(start[0], start[1], marker="o", markersize=7, color="tab:blue")
+        ax_lin.plot(
+            start[0],
+            start[1],
+            marker="o",
+            markersize=7,
+            color="tab:blue",
+            linestyle="None",
+            label="start",
+        )
+        ax_log.plot(
+            start[0],
+            start[1],
+            marker="o",
+            markersize=7,
+            color="tab:blue",
+            linestyle="None",
+            label="start",
+        )
     if goal is not None:
-        ax_lin.plot(goal[0], goal[1], marker="*", markersize=12, color="tab:red")
-        ax_log.plot(goal[0], goal[1], marker="*", markersize=12, color="tab:red")
+        ax_lin.plot(
+            goal[0],
+            goal[1],
+            marker="*",
+            markersize=12,
+            color="tab:red",
+            linestyle="None",
+            label="goal",
+        )
+        ax_log.plot(
+            goal[0],
+            goal[1],
+            marker="*",
+            markersize=12,
+            color="tab:red",
+            linestyle="None",
+            label="goal",
+        )
 
-    ax_lin.set_xlabel("x")
-    ax_lin.set_ylabel("y")
-    ax_lin.set_title("Laplace solution (linear)")
+    ax_lin.set_xlabel(r"$x$")
+    ax_lin.set_ylabel(r"$y$")
+    ax_lin.set_title(r"$\phi$", pad=15)
     ax_lin.set_aspect("equal")
-    plt.colorbar(im_lin, ax=ax_lin, fraction=0.046, pad=0.04)
-    ax_log.set_xlabel("x")
-    ax_log.set_title("Laplace solution (-log10(1 - phi))")
+    ax_lin.legend(
+        loc="center right",
+        bbox_to_anchor=(-0.25, 0.5),
+        fontsize="small",
+        framealpha=0.8,
+        borderaxespad=0.0,
+    )
+    plt.colorbar(im_lin, ax=ax_lin, fraction=0.046, pad=0.04, label=r"$\phi$")
+    ax_log.set_xlabel(r"$x$")
+    ax_log.set_ylabel(r"$y$")
+    ax_log.set_title(r"$-\log_{10}(1 - \phi)$", pad=15)
     ax_log.set_aspect("equal")
-    plt.colorbar(im_log, ax=ax_log, fraction=0.046, pad=0.04)
+    plt.colorbar(im_log, ax=ax_log, fraction=0.046, pad=0.04, label=r"$-\log_{10}(1 - \phi)$")
     return (ax_lin, ax_log)
 
 
@@ -170,11 +205,11 @@ def plot_velocity_quiver(
         width=0.0025,
         cmap="viridis",
     )
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_title("Velocity field (quiver)")
+    ax.set_xlabel(r"$x$")
+    ax.set_ylabel(r"$y$")
+    ax.set_title(r"$|v|$", pad=15)
     ax.set_aspect("equal")
-    plt.colorbar(q, ax=ax, label="|v|")
+    plt.colorbar(q, ax=ax, label=r"$|v|$")
     return ax
 
 
@@ -235,11 +270,11 @@ def plot_velocity_quiver_log(
         width=0.0025,
         cmap="viridis",
     )
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_title("Velocity field (quiver, -log10|v|)")
+    ax.set_xlabel(r"$x$")
+    ax.set_ylabel(r"$y$")
+    ax.set_title(r"$-\log_{10}|v|$", pad=15)
     ax.set_aspect("equal")
-    plt.colorbar(q, ax=ax, label="-log10(|v|)")
+    plt.colorbar(q, ax=ax, label=r"$-\log_{10}(|v|)$")
     return ax
 
 
@@ -266,17 +301,21 @@ def plot_residual_history(
 ):
     import matplotlib.pyplot as plt
 
-    fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True)
-    ax0.plot(list(residual), color="tab:blue")
-    ax0.set_ylabel("residual")
+    fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(10, 4))
+    ax0.plot(list(residual_norm), color="tab:orange")
+    ax0.set_xlabel("iteration")
+    ax0.set_ylabel(r"$\frac{\max |r_i|}{\max |r_0|}$", fontsize=15)
     ax0.set_yscale("log")
-    ax0.set_title("Residual history")
+    ax0.set_title(r"$\frac{\max |r_i|}{\max |r_0|}$", pad=15, fontsize=15)
+    ax0.set_xlim(left=0)
     ax0.grid(True, alpha=0.3)
 
-    ax1.plot(list(residual_norm), color="tab:orange")
+    ax1.plot(list(residual), color="tab:blue")
     ax1.set_xlabel("iteration")
-    ax1.set_ylabel("residual (normalized)")
+    ax1.set_ylabel(r"$\max |r_i|$")
     ax1.set_yscale("log")
+    ax1.set_title(r"$\max |r_i|$", pad=15)
+    ax1.set_xlim(left=0)
     ax1.grid(True, alpha=0.3)
     return fig, (ax0, ax1)
 
@@ -307,11 +346,15 @@ def plot_laplace_surface_3d(
         boundary_mask[:, -1] = True
         phi_plot = np.ma.masked_array(phi, mask=(occ | boundary_mask))
     surf = ax.plot_surface(X, Y, phi_plot, cmap="viridis", linewidth=0.0, antialiased=True)
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_zlabel("phi", labelpad=8)
-    ax.set_title("Laplace potential (3D surface)")
-    fig.colorbar(surf, ax=ax, shrink=0.7, pad=0.15)
+    ax.set_xlabel(r"$x$")
+    ax.set_ylabel(r"$y$")
+    ax.set_zlabel(r"$\phi$", labelpad=8)
+    ax.set_title(r"$\phi$", pad=15)
+    ax.view_init(elev=50, azim=-60)
+    ax.set_proj_type("persp", focal_length=0.9)
+    ax.margins(x=0.07, y=0.07)
+    ax.set_box_aspect((1.0, 1.0, 0.6))
+    fig.colorbar(surf, ax=ax, shrink=0.7, pad=0.15, label=r"$\phi$")
     return ax
 
 
@@ -342,11 +385,15 @@ def plot_laplace_surface_3d_log(
         phi_inv = np.ma.masked_array(phi_inv, mask=(occ | boundary_mask))
     phi_log = -np.log10(np.clip(phi_inv, 1.0e-12, None))
     surf = ax.plot_surface(X, Y, phi_log, cmap="viridis", linewidth=0.0, antialiased=True)
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_zlabel("-log10(1 - phi)", labelpad=8)
-    ax.set_title("Laplace potential (3D surface, -log10(1 - phi))")
-    fig.colorbar(surf, ax=ax, shrink=0.7, pad=0.15)
+    ax.set_xlabel(r"$x$")
+    ax.set_ylabel(r"$y$")
+    ax.set_zlabel(r"$-\log_{10}(1 - \phi)$", labelpad=8)
+    ax.set_title(r"$-\log_{10}(1 - \phi)$", pad=15)
+    ax.view_init(elev=50, azim=-60)
+    ax.set_proj_type("persp", focal_length=0.9)
+    ax.margins(x=0.07, y=0.07)
+    ax.set_box_aspect((1.0, 1.0, 0.6))
+    fig.colorbar(surf, ax=ax, shrink=0.7, pad=0.15, label=r"$-\log_{10}(1 - \phi)$")
     return ax
 
 
@@ -359,10 +406,11 @@ def plot_laplace_surface_3d_pair(
 ):
     import matplotlib.pyplot as plt
 
-    fig = plt.figure(figsize=(10, 4))
+    fig = plt.figure(figsize=(14, 6))
     ax_lin = fig.add_subplot(1, 2, 1, projection="3d")
     ax_log = fig.add_subplot(1, 2, 2, projection="3d")
     plot_laplace_surface_3d(xs, ys, phi, occ=occ, ax=ax_lin)
     plot_laplace_surface_3d_log(xs, ys, phi, occ=occ, ax=ax_log)
-    fig.tight_layout()
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.9))
+    fig.subplots_adjust(left=0.05, right=0.95, bottom=0.05, top=0.86, wspace=0.3)
     return ax_lin, ax_log
