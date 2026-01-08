@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
-# Ensure the report root is on sys.path for local imports.
+# ローカルimportを通すため、report直下を sys.path に追加する
 REPORT_ROOT = Path(__file__).resolve().parents[1]
 if str(REPORT_ROOT) not in sys.path:
     sys.path.insert(0, str(REPORT_ROOT))
@@ -28,12 +28,14 @@ from viz.plot_laplace import (
 
 
 def main() -> int:
+    # 入力レイアウトとソルバ設定
     layout_path = Path(__file__).resolve().parents[1] / "problem_gen" / "layout.yaml"
     omega = 1.5
     max_iter = 10_000
     tol = 1.0e-5
     method = SolveMethod.SOR
 
+    # レイアウト読み込みと必須パラメータの検証
     layout = load_layout_yaml(layout_path)
     if layout.world.goal is None:
         raise ValueError("goal must be set in layout.yaml")
@@ -42,6 +44,7 @@ def main() -> int:
     if layout.world.start is None:
         raise ValueError("start must be set in layout.yaml")
 
+    # 占有グリッドと境界/障害物マスクの作成
     occ, xs, ys = rasterize_occupancy_grid(layout)
     boundary_mask = np.zeros_like(occ, dtype=bool)
     boundary_mask[0, :] = True
@@ -50,6 +53,7 @@ def main() -> int:
     boundary_mask[:, -1] = True
     obstacle_mask = occ & ~boundary_mask
 
+    # 壁・障害物・ゴール領域のインデックスを準備
     wall_indices = {tuple(idx) for idx in np.argwhere(boundary_mask)}
     obstacle_indices = {tuple(idx) for idx in np.argwhere(obstacle_mask)}
 
@@ -64,6 +68,7 @@ def main() -> int:
         if not boundary_mask[i, j] and not obstacle_mask[i, j]
     }
 
+    # 数値計算の問題設定をまとめる
     problem = ProblemSpec(
         xs=xs,
         ys=ys,
@@ -71,6 +76,7 @@ def main() -> int:
         obstacle_indices=obstacle_indices,
         goal_indices=goal_indices,
     )
+    # ラプラス方程式を SOR で解く
     result = solve_laplace(
         problem,
         method=method,
@@ -78,12 +84,14 @@ def main() -> int:
         max_iter=max_iter,
         tol=tol,
     )
+    # 速度場に沿った経路追跡
     trace_result = trace_path_from_start(
         problem,
         result,
         start=layout.world.start,
     )
     path_xy = trace_result.path_xy
+    # 可視化（ポテンシャル/速度場/3D/残差履歴）
     _ = plot_laplace(
         occ,
         xs,

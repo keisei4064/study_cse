@@ -18,6 +18,8 @@ TRACE_MAX_STEPS = 5000  # 経路追跡の最大ステップ数
 
 
 class SolveMethod(Enum):
+    JACOBI = "jacobi"
+    GAUSS_SEIDEL = "gauss_seidel"
     SOR = "sor"
 
 
@@ -55,14 +57,19 @@ def solve_laplace(
     tol: float = 1.0e-5,
 ) -> LaplaceResult:
     """
-    2D Laplace 方程式を反復法で解く（数値計算部分のみ）。
+    2D Laplace 方程式を反復法で解く
 
     境界条件:
         - 外壁は Dirichlet: u = boundary_value (>0)
         - 障害物内部は Dirichlet（計算スキップ）
         - ゴール領域は Dirichlet: u = DIRICHLET_GOAL_VALUE
-        - スタート点は固定しない
     """
+    assert max_iter > 0, "max_iter は 1 以上"
+    assert tol >= 0.0, "tol は 0 以上"
+    if method == SolveMethod.SOR:
+        assert omega is not None, "SOR では omega の指定が必要"
+        assert 1.0 <= omega < 2.0, "omega は 1 以上 2 未満"
+
     xs = problem.xs
     ys = problem.ys
     nx, ny = xs.size, ys.size
@@ -107,9 +114,42 @@ def solve_laplace(
             j_range = range(ny - 2, 0, -1)
 
         match method:
+            case SolveMethod.JACOBI:
+                phi_prev = phi.copy()
+                for i in i_range:
+                    for j in j_range:
+                        if is_dirichlet[i, j]:
+                            continue
+
+                        # 残差 r の計算（前回反復の値を使う）
+                        r = (
+                            phi_prev[i - 1, j] - 2 * phi_prev[i, j] + phi_prev[i + 1, j]
+                        ) / dx2 + (
+                            phi_prev[i, j - 1] - 2 * phi_prev[i, j] + phi_prev[i, j + 1]
+                        ) / dy2  # 2Dラプラシアン
+
+                        # ヤコビ更新
+                        phi[i, j] = phi_prev[i, j] + r / L
+
+                        if abs(r) > res_max:
+                            res_max = abs(r)
+            case SolveMethod.GAUSS_SEIDEL:
+                for i in i_range:
+                    for j in j_range:
+                        if is_dirichlet[i, j]:
+                            continue
+
+                        # 残差 r の計算
+                        r = (phi[i - 1, j] - 2 * phi[i, j] + phi[i + 1, j]) / dx2 + (
+                            phi[i, j - 1] - 2 * phi[i, j] + phi[i, j + 1]
+                        ) / dy2  # 2Dラプラシアン
+
+                        # ガウスザイデル更新
+                        phi[i, j] += r / L
+
+                        if abs(r) > res_max:
+                            res_max = abs(r)
             case SolveMethod.SOR:
-                if omega is None:
-                    raise ValueError("omega is required for SOR")
                 for i in i_range:
                     for j in j_range:
                         if is_dirichlet[i, j]:
@@ -125,8 +165,6 @@ def solve_laplace(
 
                         if abs(r) > res_max:
                             res_max = abs(r)
-            case _:
-                raise ValueError(f"Unsupported method: {method}")
 
         if res_max0 is None:
             res_max0 = res_max
