@@ -81,16 +81,14 @@ def main() -> int:
         problem,
         method=method,
         omega=omega,
-        max_iter=max_iter,
-        tol=tol,
     )
-    # 速度場に沿った経路追跡
-    trace_result = trace_path_from_start(
+    # 速度場に沿った経路生成
+    path_result = trace_path_from_start(
         problem,
         result,
         start=layout.world.start,
     )
-    path_xy = trace_result.path_xy
+    path_xy = path_result.path_xy
     # 可視化（ポテンシャル/速度場/3D/残差履歴）
     _ = plot_laplace(
         occ,
