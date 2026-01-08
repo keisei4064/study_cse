@@ -1,4 +1,4 @@
 metric,seconds
-solver,0.069374
-path,0.000967
-solver+path,0.070341
+solver,0.069341
+path,0.000928
+solver+path,0.070269
