@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from typing import Tuple
+import warnings
 
 import numpy as np
 import numpy.typing as npt
@@ -282,6 +283,10 @@ def trace_path_from_start(
         norm = (ux * ux + vy * vy) ** 0.5
         if norm == 0.0:
             # 勾配が存在しないため終了
+            warnings.warn(
+                "勾配がゼロのため経路生成を終了します",
+                RuntimeWarning,
+            )
             break
         x += step * ux / norm
         y += step * vy / norm

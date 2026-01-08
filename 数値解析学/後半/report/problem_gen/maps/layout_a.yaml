@@ -7,22 +7,22 @@ world:
   - 1.0
 start:
 - 0.7
-- 0.748
+- 0.75
 goal:
 - 0.5
 - 0.55
 obstacles:
 - name: wall1
   type: wall
-  x0: 0.4
+  x0: 0.35
   y0: 0.15
-  x1: 0.4
+  x1: 0.35
   y1: 0.45
 - name: wall2
   type: wall
   x0: 0.6
   y0: 0.45
-  x1: 0.4
+  x1: 0.35
   y1: 0.45
 - name: wall3
   type: wall

@@ -410,13 +410,18 @@ def rasterize_occupancy_grid(
     # cell centers (including boundary cells)
     xs = np.linspace(x0, x1, w.nx, dtype=np.float64)
     ys = np.linspace(y0, y1, w.ny, dtype=np.float64)
-    xx, yy = np.meshgrid(xs, ys, indexing="ij")  # (nx, ny)
+    dx = xs[1] - xs[0] if xs.size > 1 else 0.0
+    dy = ys[1] - ys[0] if ys.size > 1 else 0.0
+    x_edges = np.linspace(x0 - dx / 2, x1 + dx / 2, w.nx + 1, dtype=np.float64)
+    y_edges = np.linspace(y0 - dy / 2, y1 + dy / 2, w.ny + 1, dtype=np.float64)
 
     occ = np.zeros((w.nx, w.ny), dtype=np.bool_)
     for obs in layout.obstacles:
         box = _wall_to_box(obs) if isinstance(obs, Wall) else obs
-        mask = (box.xmin <= xx) & (xx <= box.xmax) & (box.ymin <= yy) & (yy <= box.ymax)
-        occ |= mask
+        x_mask = (x_edges[:-1] < box.xmax) & (x_edges[1:] > box.xmin)
+        y_mask = (y_edges[:-1] < box.ymax) & (y_edges[1:] > box.ymin)
+        if np.any(x_mask) and np.any(y_mask):
+            occ[np.ix_(x_mask, y_mask)] = True
     # Treat outer frame as occupied wall.
     occ[0, :] = True
     occ[-1, :] = True

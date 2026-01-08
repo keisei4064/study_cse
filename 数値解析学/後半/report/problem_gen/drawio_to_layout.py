@@ -153,8 +153,8 @@ def _cell_center_world(cell: ET.Element, world: WorldInfo, *, name: str) -> tupl
     return _px_to_world(cx, cy, world)
 
 
-def _round3(value: float) -> float:
-    return round(value, 3)
+def _round2(value: float) -> float:
+    return round(value, 2)
 
 
 def parse_start_goal(
@@ -311,11 +311,11 @@ def main() -> int:
 
     layout: dict[str, object] = {
         "world": {
-            "xlim": [0.0, _round3(info.size.width)],
-            "ylim": [0.0, _round3(info.size.height)],
+            "xlim": [0.0, _round2(info.size.width)],
+            "ylim": [0.0, _round2(info.size.height)],
         },
-        "start": [_round3(start[0]), _round3(start[1])],
-        "goal": [_round3(goal[0]), _round3(goal[1])],
+        "start": [_round2(start[0]), _round2(start[1])],
+        "goal": [_round2(goal[0]), _round2(goal[1])],
         "obstacles": [],
     }
     obstacles: list[dict[str, object]] = []
@@ -324,10 +324,10 @@ def main() -> int:
             {
                 "name": f"wall{idx}",
                 "type": "wall",
-                "x0": _round3(wall.x0),
-                "y0": _round3(wall.y0),
-                "x1": _round3(wall.x1),
-                "y1": _round3(wall.y1),
+                "x0": _round2(wall.x0),
+                "y0": _round2(wall.y0),
+                "x1": _round2(wall.x1),
+                "y1": _round2(wall.y1),
             }
         )
     for idx, box in enumerate(boxes, start=1):
@@ -335,10 +335,10 @@ def main() -> int:
             {
                 "name": f"box{idx}",
                 "type": "box",
-                "xmin": _round3(box.xmin),
-                "xmax": _round3(box.xmax),
-                "ymin": _round3(box.ymin),
-                "ymax": _round3(box.ymax),
+                "xmin": _round2(box.xmin),
+                "xmax": _round2(box.xmax),
+                "ymin": _round2(box.ymin),
+                "ymax": _round2(box.ymax),
             }
         )
     layout["obstacles"] = obstacles
